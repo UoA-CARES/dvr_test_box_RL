@@ -3,12 +3,12 @@ import gym
 import cv2
 import pickle
 import random
-import json
 import numpy as np
 from collections import deque
 import matplotlib.pyplot as plt
 
 import torch
+import torch.nn.functional as F
 from networks_architectures import Encoder, Decoder
 
 
@@ -58,9 +58,23 @@ def sample_experiences(buffer, sample_size):
     return state_batch, action_batch, reward_batch, next_state_batch, done_batch
 
 
-def learn_encoder_function(buffer, encoder, decoder):
+def calc_reconstruction_loss(x, x_recon):
+    recon_error = F.mse_loss(x_recon, x, reduction='none')
 
-    sample_size = 5
+    recon_error = recon_error.sum((1, 2, 3))
+    recon_error = 0.5 * recon_error.mean()
+    return recon_error
+
+
+def calc_kl_loss(logvar, mu):
+    kld = -0.5 * torch.sum((1 + logvar - mu.pow(2) - logvar.exp()), dim=-1)
+    kld = kld.mean()
+    return kld
+
+
+def learn_encoder_function(buffer, encoder, decoder, opt_enc, opt_dec):
+
+    sample_size = 32
 
     if len(buffer) <= sample_size:
         return
@@ -69,17 +83,27 @@ def learn_encoder_function(buffer, encoder, decoder):
         state_batch, action_batch, reward_batch, next_state_batch, done_batch = sample_experiences(buffer, sample_size)
 
         state = np.array(state_batch)
-        state = torch.FloatTensor(state)
-        state = state.permute(0, 3, 1, 2)  # batch, channel, H, W
-        state = state.to(device)
+
+        state = torch.FloatTensor(state)  # change to tensor
+        state = state.permute(0, 3, 1, 2)  # batch, channel, H, W, just put in the right order
+        state = state.to(device)  # send data to GPU
 
         z, mu, log_var = encoder.forward(state)
+        x_rec          = decoder.forward(z)
 
-        x_rec = decoder.forward(z)
+        loss_rec   = calc_reconstruction_loss(state, x_rec)
+        loss_kl    = calc_kl_loss(log_var, mu)
 
-        print(x_rec.shape)
+        total_loss = loss_rec + loss_kl
 
+        opt_enc.zero_grad()
+        opt_dec.zero_grad()
 
+        total_loss.backward()
+        opt_enc.step()
+        opt_dec.step()
+
+        print(total_loss)
 
 
 
@@ -97,6 +121,9 @@ def main_run():
     encoder.to(device)
     decoder.to(device)
 
+    optimizer_enc = torch.optim.Adam(encoder.parameters(), lr=0.0001)
+    optimizer_dec = torch.optim.Adam(decoder.parameters(), lr=0.0001)
+
     for episode in range(1, num_episodes + 1):
         env.reset()
         state_image = env.render(mode='rgb_array')  # return the rendered image and can be used as input-state image
@@ -109,11 +136,11 @@ def main_run():
 
             # save image and experience here
             save_experience_buffer(state_image, action, reward, new_state_image, done, memory_buffer)
-            save_img_memory(state_image, episode, step)
+            #save_img_memory(state_image, episode, step)
 
             state_image = new_state_image
 
-            learn_encoder_function(memory_buffer, encoder, decoder)
+            learn_encoder_function(memory_buffer, encoder, decoder, optimizer_enc, optimizer_dec)
 
             if done:
                 break
@@ -121,5 +148,7 @@ def main_run():
     env.close()
 
 
+
 if __name__ == '__main__':
+
     main_run()
