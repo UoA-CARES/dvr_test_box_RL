@@ -155,6 +155,7 @@ def run_training_rl_method(env, agent, num_episodes_training, episode_horizont):
             state_image = new_state_image
 
             if done:
+
                 break
 
     agent.save_vae_model()
