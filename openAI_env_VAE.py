@@ -24,13 +24,11 @@ else:
     print("Working with CPU")
 
 
-
-
 class VAE_RL_AGENT:
     def __init__(self):
 
         self.batch_size         = 8
-        self.learning_rate      = 0.001
+        self.learning_rate      = 0.0001
         self.latent_vector_size = 32
         self.max_memory_size    = 20_000
 
@@ -59,7 +57,7 @@ class VAE_RL_AGENT:
                 x_rec, mu, log_var, z = self.vae.forward(img_states)
 
                 # ---------------- Loss Function Reconstruction + KL --------------------------#
-
+                #rec_loss = F.mse_loss(x_rec, img_states, reduction="sum")
                 rec_loss = F.binary_cross_entropy(x_rec, img_states, reduction="sum")
                 kld_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
                 total_loss = rec_loss + kld_loss
