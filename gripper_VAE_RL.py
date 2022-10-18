@@ -113,8 +113,6 @@ class ReductionLearning:
             _, _, _, z_input  = self.vae.forward(img_states)
             _, _, _, z_target = self.vae.forward(img_next_states)
 
-        print(z_input)
-
 
         distribution_probability_model = self.forward_prediction_model.forward(z_input, actions)
         loss_neg_log_likelihood = - distribution_probability_model.log_prob(z_target)
@@ -197,6 +195,7 @@ class ReductionLearning:
             loss_neg_log_likelihood.backward()
             self.forward_prediction_optimizer.step()
 
+        # I can add the actor critic model here
 
 
     def update_models(self):
