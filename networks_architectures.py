@@ -1,85 +1,12 @@
+"""
+Description: Networks Architectures
+
+Author: David Valencia
+
+"""
+
 import torch
 import torch.nn as nn
-
-
-class Flatten(nn.Module):
-    def forward(self, input_v):
-        return input_v.reshape(input_v.size(0), -1)
-
-
-class UnFlatten(nn.Module):
-    def forward(self, input_v):
-        return input_v.reshape(input_v.size(0), 256, 28, 28)
-
-
-class Encoder(nn.Module):
-    def __init__(self):
-        super(Encoder, self).__init__()
-
-        self.latent_size = 14
-
-        self.encoder_net = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=32, kernel_size=(5, 5), stride=2, padding=0),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(5, 5), stride=2, padding=0),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=(5, 5), stride=2, padding=0),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=(5, 5), stride=2, padding=0),
-            nn.ReLU(),
-            Flatten()
-        )
-        self.fc1 = nn.Linear(in_features=200704, out_features=256)
-        self.fc2 = nn.Linear(in_features=256, out_features=self.latent_size)
-        self.fc3 = nn.Linear(in_features=256, out_features=self.latent_size)
-
-    def reparametrization(self, mu, log_var):
-        std = torch.exp(0.5 * log_var)
-        eps = torch.rand_like(std)
-        z = mu + std * eps
-        return z
-
-    def encode_img(self, x):
-        h = self.encoder_net(x)
-        h_dense = self.fc1(h)
-        mu, log_var = self.fc2(h_dense), self.fc3(h_dense)
-        z = self.reparametrization(mu, log_var)
-        return z, mu, log_var
-
-    def forward(self, x):
-        z, mu, log_var = self.encode_img(x)
-        return z, mu, log_var
-
-
-class Decoder(nn.Module):
-    def __init__(self):
-        super(Decoder, self).__init__()
-        self.latent_size = 14
-
-        self.fc4 = nn.Linear(in_features=self.latent_size, out_features=1024)
-        self.fc5 = nn.Linear(in_features=1024, out_features=200704)
-
-        self.decoder_net = nn.Sequential(
-            UnFlatten(),
-            nn.ConvTranspose2d(in_channels=256, out_channels=128, kernel_size=(5, 5), stride=2, padding=0),
-            nn.ReLU(),
-            nn.ConvTranspose2d(in_channels=128, out_channels=64, kernel_size=(5, 5), stride=2, padding=0),
-            nn.ReLU(),
-            nn.ConvTranspose2d(in_channels=64, out_channels=32, kernel_size=(8, 8), stride=2, padding=0),
-            nn.ReLU(),
-            nn.ConvTranspose2d(in_channels=32, out_channels=3, kernel_size=(8, 8), stride=2, padding=1),
-            nn.Sigmoid()
-        )
-
-    def decode_img(self, z):
-        h_dense_1 = self.fc4(z)
-        h_dense_2 = self.fc5(h_dense_1)
-        xr = self.decoder_net(h_dense_2)
-        return xr
-
-    def forward(self, z):
-        xr = self.decode_img(z)
-        return xr
 
 
 class VanillaVAE(nn.Module):
@@ -150,7 +77,7 @@ class VanillaVAE(nn.Module):
     def reparameterize(self, mu, log_var):
         std = torch.exp(0.5 * log_var)
         eps = torch.rand_like(std)
-        z = mu + std * eps
+        z   = mu + std * eps
         return z
 
     def decode(self, z_vector):
@@ -163,6 +90,78 @@ class VanillaVAE(nn.Module):
 
     def forward(self, x_input):
         mu, log_var = self.encode(x_input)
-        z = self.reparameterize(mu, log_var)
+        z     = self.reparameterize(mu, log_var)
         x_rec = self.decode(z)
         return x_rec, mu, log_var, z
+
+
+
+
+# -------------------Network for Forward Predictive Model -----------------------------#
+class ForwardModelPrediction(nn.Module):
+    def __init__(self):
+        super(ForwardModelPrediction, self).__init__()
+
+        self.number_mixture_gaussians = 3
+        self.input_size_latent  = 32  # size z vector + size of action vector
+        self.input_size_actions = 4
+        self.output_size        = 32  # size of the next z prediction vector
+
+        self.input_size = self.input_size_latent + self.input_size_actions  # size z vector + size of action vector
+
+        self.hidden_size = [32, 32, 32]
+
+        self.initial_shared_layer = nn.Sequential(
+            nn.BatchNorm1d(self.input_size),
+            nn.Linear(self.input_size, self.hidden_size[0], bias=True),
+            nn.ReLU(),
+            nn.BatchNorm1d(self.hidden_size[0]),
+            nn.Linear(self.hidden_size[0], self.hidden_size[1], bias=True),
+            nn.ReLU(),
+        )
+
+        self.phi_layer = nn.Sequential(
+            nn.BatchNorm1d(self.hidden_size[1]),
+            nn.Linear(self.hidden_size[1], self.hidden_size[2], bias=True),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[2], self.output_size * self.number_mixture_gaussians),
+            nn.Softmax()
+        )
+
+        self.mean_layer = nn.Sequential(
+            nn.BatchNorm1d(self.hidden_size[1]),
+            nn.Linear(self.hidden_size[1], self.hidden_size[2], bias=True),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[2], self.output_size * self.number_mixture_gaussians)
+        )
+
+        self.std_layer = nn.Sequential(
+            nn.BatchNorm1d(self.hidden_size[1]),
+            nn.Linear(self.hidden_size[1], self.hidden_size[2], bias=True),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[2], self.output_size * self.number_mixture_gaussians),
+            nn.Softplus()
+        )
+
+    def forward(self, z_vector, action_vector):
+
+        x = torch.cat([z_vector, action_vector], dim=1)  # Concatenates the seq tensors in the given dimension
+        x = self.initial_shared_layer(x)
+
+        u = self.mean_layer(x)
+        std = torch.clamp(self.std_layer(x), min=0.001)
+        phi = self.phi_layer(x)
+
+        u   = torch.reshape(u, (-1, self.output_size, self.number_mixture_gaussians))
+        std = torch.reshape(std, (-1, self.output_size, self.number_mixture_gaussians))
+        phi = torch.reshape(phi, (-1, self.output_size, self.number_mixture_gaussians))
+
+        mix = torch.distributions.Categorical(phi)
+        norm_distr = torch.distributions.Normal(u, std)
+
+        gmm = torch.distributions.MixtureSameFamily(mix, norm_distr)
+
+        return gmm
+
+
+

@@ -39,7 +39,7 @@ class VAE_RL_AGENT:
         #self.vae_optimizer = optim.SGD(self.vae.parameters(), lr=self.learning_rate)
         self.vae_loss = []
 
-        self.N = 1  # internal loop for training VAE
+        self.N = 50  # internal loop for training VAE
 
 
     def learn_encoder_function(self):
@@ -146,6 +146,7 @@ def run_training_rl_method(env, agent, num_episodes_training, episode_horizont):
             # -----------#
             similarity, z_state = agent.calculate_z_and_similarity(state_image)
             _, z_next_state     = agent.calculate_z_and_similarity(new_state_image)
+
             if similarity >= 0.98:   # similarity_tolerance:
                 print("similarity:", similarity)
                 agent.memory.save_vector_experience_buffer(z_state, action, reward, z_next_state, done)
@@ -196,11 +197,11 @@ def main_run():
     agent = VAE_RL_AGENT()
 
     num_exploration_episodes  = 100
-    num_episodes_training     = 1000
+    num_episodes_training     = 100
     episode_horizont          = 200
 
-    run_random_exploration(env, agent, num_exploration_episodes, episode_horizont)
-    run_training_rl_method(env, agent, num_episodes_training, episode_horizont)
+    #run_random_exploration(env, agent, num_exploration_episodes, episode_horizont)
+    #run_training_rl_method(env, agent, num_episodes_training, episode_horizont)
     #run_training_vae_only(agent)
     evaluate_vae_model(env, agent)
     env.close()

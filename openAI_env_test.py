@@ -1,3 +1,11 @@
+
+"""
+Description:
+            Just a simple file to test if OpenAI env are installed properly
+
+"""
+
+
 import gym
 import ale_py
 
