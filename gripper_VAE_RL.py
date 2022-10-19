@@ -16,20 +16,20 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 from gripper_function_utilities import Utilities
-from gripper_vision_utilities   import VisionCamera
 from gripper_environment_utilities import RL_ENV
 
 from memory_utilities import MemoryClass
 from networks_architectures import VanillaVAE, ForwardModelPrediction
 
-
+# todo should i use or not the eval() mode when i need a network during the training ?
 class ReductionLearning:
     def __init__(self):
         # values for loops
 
 
-        self.batch_size         = 8
-        self.latent_vector_size = 32
+        self.batch_size          = 8
+        self.minimal_buffer_size = 256
+        self.latent_vector_size  = 32
 
         self.exploration_episodes = 10_000  # todo do i need this ?
 
@@ -37,7 +37,7 @@ class ReductionLearning:
         self.max_memory_size = 10_000
 
         self.device = Utilities().detect_device()
-        self.vision = VisionCamera(self.camera_index)
+        #self.vision = VisionCamera(self.camera_index)
         self.memory = MemoryClass(self.max_memory_size)
         self.env = RL_ENV()
 
@@ -60,11 +60,12 @@ class ReductionLearning:
     def learn_vae_model_function(self):
         # Full reconstruction VAE model
         # input random sampled batch of preprocessed images (batch, 3, 128, 128)
-        if len(self.memory.memory_buffer) <= self.batch_size:
+        if len(self.memory.memory_buffer) <= self.minimal_buffer_size:
             return
         else:
             # sample from memory a batch but care about image-only
             img_states, _, _, _, _ = self.memory.sample_full_experiences(self.batch_size)
+
             img_states = np.array(img_states)
             img_states = torch.FloatTensor(img_states)  # change to tensor
             img_states = img_states.permute(0, 3, 1, 2)  # just put in the right order [b, 3, 128, 128]
@@ -89,7 +90,7 @@ class ReductionLearning:
             # --------------------------------------------------------------------------------
 
     def learn_predictive_model_function(self):
-        if len(self.memory.memory_buffer) <= self.batch_size:
+        if len(self.memory.memory_buffer) <= self.minimal_buffer_size:
             return
         else:
             img_states, actions, _, img_next_states, _ = self.memory.sample_full_experiences(self.batch_size)
@@ -128,7 +129,41 @@ class ReductionLearning:
 
 
     def policy_learning_function(self):
-        pass
+
+        #if len(self.memory.memory_buffer) <= self.minimal_buffer_size:
+        if len(self.memory.memory_buffer) <= 8:
+            return
+        else:
+            img_states, actions, rewards, img_next_states, dones = self.memory.sample_full_experiences(self.batch_size)
+
+            img_states = np.array(img_states)
+            img_states = torch.FloatTensor(img_states)  # change to tensor
+            img_states = img_states.permute(0, 3, 1, 2)  # just put in the right order [b, 3, 128, 128]
+            img_states = img_states.to(self.device)  # send batch to GPU
+
+            actions = np.array(actions)
+            actions = torch.FloatTensor(actions)
+            actions = actions.to(self.device)  # send batch to GPU
+
+            img_next_states = np.array(img_next_states)
+            img_next_states = torch.FloatTensor(img_next_states)
+            img_next_states = img_next_states.permute(0, 3, 1, 2)
+            img_next_states = img_next_states.to(self.device)  # send batch to GPU
+
+            rewards = np.array(rewards).reshape(-1, 1)
+            rewards = torch.FloatTensor(rewards)
+            rewards = rewards.to(self.device)
+
+            with torch.no_grad():
+                self.vae.eval()
+                _, _, _, z_state      = self.vae.forward(img_states)
+                _, _, _, z_next_state = self.vae.forward(img_next_states)
+
+            # todo need to create the state_space observation here
+            # observation space (encode_image vector, valve_angle, target_angle, novelty, surprise)
+            # valve and target angle could come with the sampled batch
+
+
 
     def calculate_novelty(self):
         pass
@@ -142,6 +177,7 @@ class ReductionLearning:
             return
         else:
             img_states, actions, _, img_next_states, _ = self.memory.sample_full_experiences(self.batch_size)
+
             img_states = np.array(img_states)
             img_states = torch.FloatTensor(img_states)  # change to tensor
             img_states = img_states.permute(0, 3, 1, 2)  # just put in the right order [b, 3, 128, 128]
@@ -163,19 +199,18 @@ class ReductionLearning:
                 param.requires_grad = False
 
             x_rec, mu, log_var, z_input = self.vae.forward(img_states)
-            _, _, _, z_target          = self.vae.forward(img_next_states)
+            _, _, _, z_target           = self.vae.forward(img_next_states)
 
             # ---------------- Loss Function Reconstruction + KL --------------------------#
             # rec_loss = F.mse_loss(x_rec, img_states, reduction="sum")
             rec_loss = F.binary_cross_entropy(x_rec, img_states, reduction="sum")
             kld_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
-            total_loss = rec_loss + kld_loss
+            total_loss_vae = rec_loss + kld_loss
             # ------------------------------------------------------------------------------#
             self.vae.train()
             self.vae_optimizer.zero_grad()
-            total_loss.backward()
+            total_loss_vae.backward()
             self.vae_optimizer.step()
-
 
             #  =========== train forward prediction model only  ===========
             for param in self.vae.parameters():
@@ -195,13 +230,16 @@ class ReductionLearning:
             loss_neg_log_likelihood.backward()
             self.forward_prediction_optimizer.step()
 
+
         # I can add the actor critic model here
+        #  =========== train actor critic model only  ===========
+
 
 
     def update_models(self):
         #self.learn_vae_model_function()
-        self.learn_predictive_model_function()
-
+        #self.learn_predictive_model_function()
+        self.policy_learning_function()
         #self.learn_all_online()
 
 
@@ -217,22 +255,40 @@ class ReductionLearning:
             state_image = new_state_image
 
 
-    def rl_idea_training(self):
-        state_raw_image = self.vision.get_camera_image()
-        state_image     = self.vision.pre_pro_image(state_raw_image)
+    def rl_idea_training(self, horizontal_steps=50, num_episodes=100):
 
-        for episode in range(1, 100):
+        state_raw_image = self.env.vision_config.get_camera_image()
+        state_image     = self.env.vision_config.pre_pro_image(state_raw_image)
+
+        target_angle    = self.env.define_goal_angle()
+        valve_angle     = self.env.get_valve_angle()
+
+        # todo set the reset function here
+
+        for episode in range(1, horizontal_steps+1):
+
             action = self.env.generate_sample_act()  # todo update this with an action from policy
-            self.env.env_step(action)
-            new_state_raw_image = self.vision.get_camera_image()
-            new_state_image     = self.vision.pre_pro_image(new_state_raw_image)
-            #reward, done = self.env.calculate_reward()  #todo add the reward calculation
-            reward = 10
-            done   = False
-            self.memory.save_full_experience_buffer(state_image, action, reward, new_state_image, done)
-            state_image = new_state_image
 
-            self.update_models()
+            self.env.env_step(action)
+
+            new_state_raw_image = self.env.vision_config.get_camera_image()
+            new_state_image     = self.env.vision_config.pre_pro_image(new_state_raw_image)
+            new_valve_angle     = self.env.get_valve_angle()
+
+            reward, done = self.env.calculate_extrinsic_reward(target_angle, new_valve_angle)
+
+            #self.memory.save_full_experience_buffer(state_image, action, reward, new_state_image, done, valve_angle, new_valve_angle, target_angle)
+            # todo could also create other buffer with (z,a,r,zt,done, target, valve_angle) where z is added valve and target valve
+
+            state_image = new_state_image
+            valve_angle = new_valve_angle
+
+
+            if done:
+                print("done TRUE, breaking loop")
+                break
+
+            #self.update_models()
 
             '''
             while True:
@@ -244,9 +300,6 @@ class ReductionLearning:
                 else:
                     pass
             '''
-
-
-
 
 
     def vae_evaluation(self):
@@ -278,8 +331,6 @@ class ReductionLearning:
 def main_run():
     model = ReductionLearning()
     model.rl_idea_training()
-
-
 
 
 if __name__ == '__main__':

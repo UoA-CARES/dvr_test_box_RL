@@ -16,9 +16,9 @@ class VisionCamera:
         self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 960)
 
-        self.arucoDict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_50)
+        self.arucoDict   = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_50)
         self.arucoParams = cv2.aruco.DetectorParameters_create()
-        self.markerSize = 18  # size of the aruco marker millimeters
+        self.markerSize  = 18  # size of the aruco marker millimeters
 
         self.valve_mark_id = 6
         self.vision_flag_status = False
@@ -32,6 +32,8 @@ class VisionCamera:
         ret, frame = self.camera.read()
         if ret:
             return frame
+        else:
+            print("problem capturing frame")
 
     def image_function(self):
         while True:
@@ -86,20 +88,18 @@ class VisionCamera:
         (corners, IDs, rejected) = cv2.aruco.detectMarkers(image, self.arucoDict, parameters=self.arucoParams)
         rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(corners, self.markerSize, self.matrix, self.distortion)
         cv2.aruco.drawDetectedMarkers(image, corners, borderColor=(0, 0, 255))
-
         try:
             if len(IDs) >= 1:
                 if IDs[0] == 6:
                     valve_angle = np.array([self.get_angle(rvec[0][0])])
-                    #print("Valve Angle:", valve_angle)
                     self.vision_flag_status = True
-                    return image, valve_angle, self.vision_flag_status
+                    return valve_angle, self.vision_flag_status
+
                 else:
                     print("valve aruco marker no detected")
                     self.vision_flag_status = False
-                    return image, 0, self.vision_flag_status
+                    return 0.0, self.vision_flag_status
         except:
             print("valve aruco marker no detected")
             self.vision_flag_status = False
-            return image, 0, self.vision_flag_status
-
+            return 0.0, self.vision_flag_status

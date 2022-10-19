@@ -1,9 +1,9 @@
 import torch
-
+import random
 
 class Utilities:
     def __init__(self):
-        pass
+       pass
 
     def detect_device(self):
         if torch.cuda.is_available():
@@ -21,4 +21,6 @@ class Utilities:
     def load_vae_model(self, model):
         model.load_state_dict(torch.load("trained_models/vae_model_gripper.pth"))
         print("VAE model has been loaded")
+
+
 
