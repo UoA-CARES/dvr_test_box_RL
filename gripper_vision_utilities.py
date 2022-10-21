@@ -11,7 +11,7 @@ import numpy as np
 
 
 class VisionCamera:
-    def __init__(self, camera_index=2):
+    def __init__(self, camera_index=0):
         self.camera = cv2.VideoCapture(camera_index)  # open the camera
         self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 960)
@@ -45,8 +45,8 @@ class VisionCamera:
         img = cv2.resize(image_array, (128, 128), interpolation=cv2.INTER_AREA)
         # can also crop the image here
         norm_image = cv2.normalize(img, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-        # cv2.imshow("Normalized image", norm_image)
-        # cv2.waitKey(10)
+        #cv2.imshow("Normalized image", norm_image)
+        #cv2.waitKey(10)
         return norm_image
 
 
@@ -103,3 +103,4 @@ class VisionCamera:
             print("valve aruco marker no detected")
             self.vision_flag_status = False
             return 0.0, self.vision_flag_status
+

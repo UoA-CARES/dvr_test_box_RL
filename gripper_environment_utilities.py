@@ -12,8 +12,10 @@ class RL_ENV:
 
     def __init__(self):
 
+        self.camera_index = 0
+
         self.motors_config = Motor()
-        self.vision_config = VisionCamera()
+        self.vision_config = VisionCamera(self.camera_index)
 
         self.angle_valve_deg  = 0.0
         self.goal_angle_deg   = 0.0
@@ -69,7 +71,6 @@ class RL_ENV:
         return self.goal_angle_deg
 
     def calculate_extrinsic_reward(self, target_angle, valve_angle):
-
         angle_difference = np.abs(target_angle - valve_angle)
 
         if angle_difference <= 10:
