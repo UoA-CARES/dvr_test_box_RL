@@ -6,7 +6,7 @@ from gripper_vision_utilities import VisionCamera
 
 import numpy as np
 import random
-
+import time
 
 class RL_ENV:
 
@@ -29,7 +29,16 @@ class RL_ENV:
         return action_vector
 
     def env_reset(self):
-        pass
+        id_1_dxl_home_position = 310
+        id_2_dxl_home_position = 310
+        id_3_dxl_home_position = 690
+        id_4_dxl_home_position = 690
+        print("Sending Robot to Home Position")
+        self.motors_config.move_motor_step(id_1_dxl_home_position, id_2_dxl_home_position,
+                                           id_3_dxl_home_position, id_4_dxl_home_position)
+
+        time.sleep(1.0)  # just to make sure robot is moving to home position
+
 
     def env_step(self, actions):
         id_1_dxl_goal_position = (actions[0] - (-1)) * (700 - 300) / (1 - (-1)) + 300
@@ -47,12 +56,6 @@ class RL_ENV:
                                            id_3_dxl_goal_position,
                                            id_4_dxl_goal_position)
 
-    def state_space_function(self):
-        pass
-
-    def get_sample_reduction(self):
-        pass
-
     def get_valve_angle(self):
         while True:
             valve_angle, vision_flag_status = self.vision_config.get_aruco_angle()
@@ -64,11 +67,11 @@ class RL_ENV:
 
 
     def define_goal_angle(self):
-        random.seed(10)
-        # self.goal_angle = random.randint(-180, 180)
-        self.goal_angle_deg = random.randint(0, 360)
+        # self.goal_angle_deg = random.randint(0, 360)
+        self.goal_angle = random.randint(-180, 180)  # because the valve dtection return this
         print("New Goal Angle Generated", self.goal_angle_deg)
         return self.goal_angle_deg
+
 
     def calculate_extrinsic_reward(self, target_angle, valve_angle):
         angle_difference = np.abs(target_angle - valve_angle)

@@ -14,7 +14,7 @@ class Utilities:
             print("Working with CPU")
         return device
 
-    def save_vae_model(self, model):
+    def save_models(self, model):
         torch.save(model.state_dict(), "trained_models/vae_model_gripper.pth")
         print("VAE model has been saved")
 
