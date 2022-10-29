@@ -29,7 +29,7 @@ class VAE_RL_AGENT:
         self.device = device
 
         # -------- Hyper-parameters --------------- #
-        self.batch_size          = 64
+        self.batch_size          = 32
         self.minimal_buffer_size = 256
 
         self.gamma = 0.99
@@ -42,7 +42,7 @@ class VAE_RL_AGENT:
         self.num_action = 1
 
         # ---- Initialization replay memory --- #
-        self.max_memory_size = 40_000
+        self.max_memory_size = 50_000
         self.memory = MemoryClass(self.max_memory_size)
 
         # ---- Initialization and build VAE Model --- #
@@ -565,6 +565,7 @@ def run_training_rl_method(env, agent, num_episodes_training=100, episode_horizo
     rewards = []
 
     for episode in range(1, num_episodes_training + 1):
+
         print(f"-----------------Episode {episode}-----------------------------")
         env.reset()
         episode_reward = 0
@@ -574,7 +575,7 @@ def run_training_rl_method(env, agent, num_episodes_training=100, episode_horizo
         for step in range(1, episode_horizont + 1):
 
             action = agent.get_action_from_policy(state_image)
-            noise  = np.random.normal(0, scale=0.05, size=1)
+            noise  = np.random.normal(0, scale=0.1, size=1)
             action = action + noise
             action = np.clip(action, -2, 2)
 
@@ -606,8 +607,8 @@ def run_training_rl_method(env, agent, num_episodes_training=100, episode_horizo
             agent.plot_functions(rewards)
 
     # todo save RL models
-    #agent.plot_functions(rewards)
-    #agent.save_vae_model()
+    agent.plot_functions(rewards)
+    agent.save_vae_model()
 
 
 def evaluate_vae_model(env, agent):
@@ -615,7 +616,7 @@ def evaluate_vae_model(env, agent):
     state_image = env.render(mode='rgb_array')
     state_image = pre_pro_image(state_image)
 
-    agent.load_vae_model()
+    #agent.load_vae_model()
     agent.vae.eval()
     #agent.simple_encoder.eval()
     with torch.no_grad():
@@ -650,7 +651,7 @@ def main_run():
     #run_random_exploration(env, agent, num_exploration_episodes, episode_horizont)
     # run_training_vae_only(agent)
 
-    num_episodes_training     = 100
+    num_episodes_training     = 2000
     episode_horizont          = 200
     run_training_rl_method(env, agent, num_episodes_training, episode_horizont)
     evaluate_vae_model(env, agent)

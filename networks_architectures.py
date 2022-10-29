@@ -151,8 +151,9 @@ class VanillaVAE(nn.Module):
 
     def reparameterize(self, mu, log_var):
         std = torch.exp(0.5 * log_var)
-        eps = torch.rand_like(std)
-        z = mu + std * eps
+        #eps = torch.rand_like(std)
+        #z = mu + std * eps
+        z = mu + std
         return z
 
     def decode(self, z_vector):
