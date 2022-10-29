@@ -24,8 +24,12 @@ else:
 
 
 class Motor:
-    def __init__(self):
-        DEVICENAME = '/dev/ttyUSB0'  # USB used
+    def __init__(self, device_index=0):
+
+        if device_index == 0:
+            DEVICENAME = '/dev/ttyUSB0'  # USB used
+        else:
+            DEVICENAME = '/dev/ttyUSB1'  # USB used
 
         #  ------------------Initial Parameters---------------------------
         # Address of each parameter. See the eManual for details about these values

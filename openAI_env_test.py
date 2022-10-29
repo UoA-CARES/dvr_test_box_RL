@@ -1,8 +1,8 @@
 
 """
 Description:
-            Just a simple file to test if OpenAI env are installed properly
-
+            Just a simple script to test if OpenAI envs are installed properly
+s
 """
 
 

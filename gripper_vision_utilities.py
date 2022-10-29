@@ -12,6 +12,8 @@ import numpy as np
 
 class VisionCamera:
     def __init__(self, camera_index=0):
+
+
         self.camera = cv2.VideoCapture(camera_index)  # open the camera
         self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 960)
@@ -42,9 +44,9 @@ class VisionCamera:
             cv2.waitKey(10)
 
     def pre_pro_image(self, image_array):
-        img = cv2.resize(image_array, (128, 128), interpolation=cv2.INTER_AREA)
-        # can also crop the image here
-        norm_image = cv2.normalize(img, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+        img_cropped = image_array[240:820, 70:1020]
+        img_resize  = cv2.resize(img_cropped, (128, 128), interpolation=cv2.INTER_AREA)
+        norm_image  = cv2.normalize(img_resize, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
         #cv2.imshow("Normalized image", norm_image)
         #cv2.waitKey(10)
         return norm_image
