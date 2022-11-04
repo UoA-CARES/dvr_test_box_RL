@@ -17,7 +17,7 @@ class SimpleEncoder(nn.Module):
 
         # Build Encoder Part:
         self.encoder_net = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(32),
             nn.LeakyReLU(),
             nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=2, padding=1),
@@ -56,7 +56,7 @@ class SimpleEncoder(nn.Module):
         )
 
         self.final_layer = nn.Sequential(
-            nn.ConvTranspose2d(in_channels=32, out_channels=3, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(in_channels=32, out_channels=1, kernel_size=3, stride=2, padding=1, output_padding=1),
             nn.Sigmoid()
         )
 
@@ -82,8 +82,6 @@ class SimpleEncoder(nn.Module):
 
 
 
-
-
 class VanillaVAE(nn.Module):
     def __init__(self, latent_dim):
         super(VanillaVAE, self).__init__()
@@ -91,7 +89,7 @@ class VanillaVAE(nn.Module):
 
         # Build Encoder Part:
         self.encoder_net = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(32),
             nn.LeakyReLU(),
             nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=2, padding=1),
@@ -132,13 +130,8 @@ class VanillaVAE(nn.Module):
         )
 
         self.final_layer = nn.Sequential(
-            nn.ConvTranspose2d(in_channels=32, out_channels=3, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(in_channels=32, out_channels=1, kernel_size=3, stride=2, padding=1, output_padding=1),
             nn.Sigmoid()
-            # nn.ConvTranspose2d(in_channels=32, out_channels=32, kernel_size=3, stride=2, padding=1, output_padding=1),
-            # nn.BatchNorm2d(32),
-            # nn.LeakyReLU(),
-            # nn.Conv2d(in_channels=32, out_channels=3, kernel_size=3, padding=1),
-            # nn.Sigmoid()
         )
 
     def encode(self, x_input):
@@ -151,9 +144,8 @@ class VanillaVAE(nn.Module):
 
     def reparameterize(self, mu, log_var):
         std = torch.exp(0.5 * log_var)
-        #eps = torch.rand_like(std)
-        #z = mu + std * eps
-        z = mu + std
+        eps = torch.rand_like(std)
+        z = mu + std * eps
         return z
 
     def decode(self, z_vector):
@@ -244,8 +236,9 @@ class Critic(nn.Module):
 
         self.vector_size = vector_size
         self.num_actions = num_actions
-        self.input_size = self.vector_size + self.num_actions
+        self.input_size  = self.vector_size + self.num_actions
         self.hidden_size = [128, 64, 32]
+        #self.hidden_size = [32, 16, 8]
 
         self.h_linear_1 = nn.Linear(in_features=self.input_size, out_features=self.hidden_size[0])
         self.h_linear_2 = nn.Linear(in_features=self.hidden_size[0], out_features=self.hidden_size[1])
@@ -260,6 +253,41 @@ class Critic(nn.Module):
         x = self.h_linear_4(x)  # No activation function here
         return x
 
+class SpecialCritic(nn.Module):
+    def __init__(self, vector_size, num_actions):
+        super(SpecialCritic, self).__init__()
+
+        self.vector_size = vector_size
+        self.num_actions = num_actions
+        self.input_size  = self.vector_size + self.num_actions
+        self.hidden_size = [128, 64, 32]
+
+        self.Q1 = nn.Sequential(
+            nn.Linear(self.input_size, self.hidden_size[0]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[0], self.hidden_size[1]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[1], self.hidden_size[2]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[2], self.num_actions)
+        )
+
+        self.Q2 = nn.Sequential(
+            nn.Linear(self.input_size, self.hidden_size[0]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[0], self.hidden_size[1]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[1], self.hidden_size[2]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[2], self.num_actions)
+        )
+
+    def forward(self,  state, action):
+        x = torch.cat([state, action], dim=1)
+        q1 = self.Q1(x)
+        q2 = self.Q2(x)
+        return q1, q2
+
 
 class Actor(nn.Module):
     def __init__(self, vector_size, num_actions):
@@ -268,18 +296,20 @@ class Actor(nn.Module):
         self.input_size = vector_size
         self.num_actions = num_actions
         self.hidden_size = [128, 64, 32]
+        #self.hidden_size = [32, 16, 8]
 
         self.h_linear_1 = nn.Linear(in_features=self.input_size, out_features=self.hidden_size[0])
         self.h_linear_2 = nn.Linear(in_features=self.hidden_size[0], out_features=self.hidden_size[1])
         self.h_linear_3 = nn.Linear(in_features=self.hidden_size[1], out_features=self.hidden_size[2])
-        self.bn1 = nn.BatchNorm1d(self.hidden_size[2])
+        #self.bn1 = nn.BatchNorm1d(self.hidden_size[2])
         self.h_linear_4 = nn.Linear(in_features=self.hidden_size[2], out_features=self.num_actions)
 
     def forward(self, state):
         x = torch.relu(self.h_linear_1(state))
         x = torch.relu(self.h_linear_2(x))
-        x = torch.relu(self.bn1(self.h_linear_3(x)))
-        x = torch.tanh(self.h_linear_4(x))
+        #x = torch.relu(self.bn1(self.h_linear_3(x)))
+        x = torch.relu(self.h_linear_3(x))
+        x = torch.tanh(self.h_linear_4(x)) * 2.0  # fix get this value automatically this only for pendulum
         return x
 
 
@@ -409,3 +439,114 @@ class VAE_Critic(nn.Module):
         x_rec = self.decode(z)
         q_val = self.critic(z, action)
         return x_rec, mu, log_var, z, q_val
+
+
+#-------------------------------------------------------------------------------------#
+# networks architectures for SAC
+
+class ValueNetworkSAC(nn.Module):
+    def __init__(self, vector_size):
+        super(ValueNetworkSAC, self).__init__()
+
+        self.input_size  = vector_size
+        self.hidden_size = [128, 64, 32]
+
+        self.val_net = nn.Sequential(
+            nn.Linear(self.input_size, self.hidden_size[0]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[0], self.hidden_size[1]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[1], self.hidden_size[2]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[2], 1)
+        )
+
+    def forward(self, state):
+        x = self.val_net(state)
+        return x
+
+class SoftQNetworkSAC(nn.Module):
+    def __init__(self, vector_size, num_actions):
+        super(SoftQNetworkSAC, self).__init__()
+
+        self.vector_size = vector_size
+        self.num_actions = num_actions
+        self.input_size = self.vector_size + self.num_actions
+        self.hidden_size = [128, 64, 32]
+
+        self.Q1 = nn.Sequential(
+            nn.Linear(self.input_size, self.hidden_size[0]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[0], self.hidden_size[1]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[1], self.hidden_size[2]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[2], 1)  # todo no sure why the output here is 1
+        )
+
+        self.Q2 = nn.Sequential(
+            nn.Linear(self.input_size, self.hidden_size[0]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[0], self.hidden_size[1]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[1], self.hidden_size[2]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[2], 1)  # todo no sure why the output here is 1
+        )
+
+    def forward(self, state, action):
+        x = torch.cat([state, action], dim=1)
+        q1 = self.Q1(x)
+        q2 = self.Q2(x)
+        return q1, q2
+
+
+class PolicyNetworkSAC(nn.Module):
+    def __init__(self, vector_size, num_actions):
+        super(PolicyNetworkSAC, self).__init__()
+
+        self.log_std_min = -20
+        self.log_std_max = 2
+
+        self.num_actions = num_actions
+        self.input_size  = vector_size
+        self.hidden_size = [128, 64, 32]
+
+        self.linear1 = nn.Linear(self.input_size,     self.hidden_size[0])
+        self.linear2 = nn.Linear(self.hidden_size[0], self.hidden_size[1])
+
+        self.mean_linear    = nn.Linear(self.hidden_size[1], self.num_actions)
+        self.log_std_linear = nn.Linear(self.hidden_size[1], self.num_actions)
+
+    def forward(self, state):
+        x = torch.relu(self.linear1(state))
+        x = torch.relu(self.linear2(x))
+
+        mean    = self.mean_linear(x)
+        log_std = self.log_std_linear(x)
+        log_std = torch.clamp(log_std, self.log_std_min, self.log_std_max)
+
+        return mean, log_std
+
+
+class PolicyNetworkSACDeterministic(nn.Module):
+    def __init__(self, vector_size, num_actions):
+        super(PolicyNetworkSACDeterministic, self).__init__()
+
+
+        self.num_actions = num_actions
+        self.input_size  = vector_size
+        self.hidden_size = [128, 64, 32]
+
+        self.linear1 = nn.Linear(self.input_size,     self.hidden_size[0])
+        self.linear2 = nn.Linear(self.hidden_size[0], self.hidden_size[1])
+
+        self.mean  = nn.Linear(self.hidden_size[1], self.num_actions)
+
+
+    def forward(self, state):
+        x = torch.relu(self.linear1(state))
+        x = torch.relu(self.linear2(x))
+        mean = torch.tanh(self.mean(x))  * 2.0  # this "2" is for pendulum range
+        return mean
+

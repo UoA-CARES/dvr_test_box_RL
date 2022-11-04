@@ -23,10 +23,11 @@ class MemoryClass:
         return batch_img
 
 
+    #def save_frame_vector_experience_buffer(self, state, action, reward, next_state, done, angle, target):
     def save_frame_vector_experience_buffer(self, state, action, reward, next_state, done):
+        #experience = (state, action, reward, next_state, done, angle, target)
         experience = (state, action, reward, next_state, done)
         self.memory_buffer_experiences.append(experience)
-
 
     def sample_frame_vector_experiences(self, sample_size):
         state_batch      = []
@@ -34,18 +35,24 @@ class MemoryClass:
         reward_batch     = []
         next_state_batch = []
         done_batch       = []
+        #angle_batch      = []
+        #target_batch     = []
 
         batch = random.sample(self.memory_buffer_experiences, sample_size)
 
         for experience in batch:
+            #state, action, reward, next_state, done, angle, target = experience
             state, action, reward, next_state, done = experience
+
             state_batch.append(state)
             action_batch.append(action)
             reward_batch.append(reward)
             next_state_batch.append(next_state)
             done_batch.append(done)
+            #angle_batch.append(angle)
+            #target_batch.append(target)
 
-        return state_batch, action_batch, reward_batch, next_state_batch, done_batch
+        return state_batch, action_batch, reward_batch, next_state_batch, done_batch #, angle_batch, target_batch
 
 
     def save_full_experience_buffer(self, state, action, reward, next_state, done, valve_angle, next_valve_angle, target_angle):
