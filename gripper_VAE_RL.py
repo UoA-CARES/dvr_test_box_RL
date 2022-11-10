@@ -512,7 +512,8 @@ class ReductionLearning:
             valve_angle     = self.env.get_valve_angle()
 
             for step in range(1, horizontal_steps+1):
-                action = self.get_action_from_policy(state_image, valve_angle, target_angle)
+                #action = self.get_action_from_policy(state_image, valve_angle, target_angle)
+                action = self.env.generate_sample_act()
                 noise  = np.random.normal(0, scale=0.15, size=4)
                 action = action + noise
                 action = np.clip(action, -1, 1)
@@ -582,15 +583,15 @@ class ReductionLearning:
 
 def main_run():
     parser = ArgumentParser()
-    parser.add_argument('--camera_index', type=int, default=0)
+    parser.add_argument('--camera_index', type=int, default=2)
     parser.add_argument('--usb_index', type=int, default=0)
     parser.add_argument('--robot_index', type=str, default='robot-1')
     args = parser.parse_args()
     params = vars(args)
 
     model = ReductionLearning(params)
-    #model.rl_idea_training()
-    model.vae_evaluation()
+    model.rl_idea_training()
+    #model.vae_evaluation()
 
 
 if __name__ == '__main__':

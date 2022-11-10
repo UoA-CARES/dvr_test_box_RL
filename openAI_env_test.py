@@ -2,7 +2,6 @@
 """
 Description:
             Just a simple script to test if OpenAI envs are installed properly
-s
 """
 
 
@@ -21,7 +20,7 @@ env = gym.make('CartPole-v1')
 
 
 for e in range(20):
-    obser = env.reset()
+    observation = env.reset()
     for t in range(10000):
         env.render()
         action = env.action_space.sample()

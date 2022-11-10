@@ -198,7 +198,7 @@ def main_run():
     env = gym.make('Pendulum-v1')
     agent = TD3Agent()
     num_episodes_exploration  = 200
-    num_episodes_training     = 1000
+    num_episodes_training     = 200
     episode_horizont          = 200
 
     run_exploration(env, agent, num_episodes_exploration, episode_horizont)
