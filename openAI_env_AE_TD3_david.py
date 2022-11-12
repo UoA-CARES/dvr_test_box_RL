@@ -23,7 +23,7 @@ else:
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Memory:
 
-    def __init__(self, replay_max_size=20_000):
+    def __init__(self, replay_max_size=40_000):
         self.replay_max_size = replay_max_size
         self.memory_buffer   = deque(maxlen=replay_max_size)
 
@@ -53,15 +53,15 @@ class Memory:
         done_batch       = np.array(done_batch).reshape(-1, 1)
         next_state_batch = np.array(next_state_batch)
 
-        state_batch_tensor      = torch.FloatTensor(state_batch)
+        state_batch_tensor      = torch.FloatTensor(state_batch).to(device)
         action_batch_tensor     = torch.FloatTensor(action_batch).to(device)
         reward_batch_tensor     = torch.FloatTensor(reward_batch).to(device)
         done_batch_tensor       = torch.FloatTensor(done_batch).to(device)
-        next_batch_state_tensor = torch.FloatTensor(next_state_batch)
+        next_batch_state_tensor = torch.FloatTensor(next_state_batch).to(device)
 
         # just put in the right order [b, 3, H, W]
-        state_batch_tensor      = state_batch_tensor.permute(0, 3, 1, 2).to(device)
-        next_batch_state_tensor = next_batch_state_tensor.permute(0, 3, 1, 2).to(device)
+        state_batch_tensor      = state_batch_tensor.permute(0, 3, 1, 2)
+        next_batch_state_tensor = next_batch_state_tensor.permute(0, 3, 1, 2)
 
         return state_batch_tensor, action_batch_tensor, reward_batch_tensor, next_batch_state_tensor, done_batch_tensor
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -70,6 +70,12 @@ class Encoder(nn.Module):
     def __init__(self, latent_dim):
         super(Encoder, self).__init__()
 
+        self.cov_net = nn.ModuleList([nn.Conv2d(3,  32, 3, stride=2),
+                                      nn.Conv2d(32, 32, 3, stride=1),
+                                      nn.Conv2d(32, 32, 3, stride=1),
+                                      nn.Conv2d(32, 32, 3, stride=1),
+                                      ])
+        '''
         self.cov_net = nn.Sequential(
             nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, stride=2, padding=0),
             nn.ReLU(),
@@ -80,18 +86,47 @@ class Encoder(nn.Module):
             nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=0),
             nn.ReLU(),
         )
-        self.fc_1 = nn.Linear(39200, latent_dim)
-        self.ln   = nn.LayerNorm(latent_dim)
+        '''
+        self.fc  = nn.Linear(39200, latent_dim)
+        self.ln  = nn.LayerNorm(latent_dim)
+
+    def forward_conv(self, x):
+        x = torch.relu(self.cov_net[0](x))
+        x = torch.relu(self.cov_net[1](x))
+        x = torch.relu(self.cov_net[2](x))
+        x = torch.relu(self.cov_net[3](x))  # torch.Size([1, 32, 35, 35])
+        x = torch.flatten(x, start_dim=1)  # torch.Size([batch_size, 39200])
+        return x
 
     def forward(self, x, detach_encoder=False):
+        '''
         x = self.cov_net(x)  # torch.Size([1, 32, 35, 35])
-        x = torch.flatten(x, start_dim=1)  # torch.Size([batch_size, 39200])
-        x = self.fc_1(x)
+        if detach_encoder:
+            x = torch.flatten(x, start_dim=1)  # torch.Size([batch_size, 39200])
+            x = x.detach()
+        else:
+            x = torch.flatten(x, start_dim=1)  # torch.Size([batch_size, 39200])
+        x = self.fc(x)
         x = self.ln(x)
         x = torch.tanh(x)    # output between -1 ~ 1
+        return x
+        '''
+
+        x = self.forward_conv(x)
         if detach_encoder:
             x = x.detach()
+
+        x = self.fc(x)
+        x = self.ln(x)
+        x = torch.tanh(x)
         return x
+
+    def copy_conv_weights_from(self, model_source):
+        for i in range(4):
+            self.cov_net[i].weight = model_source.cov_net[i].weight
+            self.cov_net[i].bias   = model_source.cov_net[i].bias
+
+
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Decoder(nn.Module):
@@ -117,21 +152,37 @@ class Decoder(nn.Module):
         x = self.decov_net(x)
         return x
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+def weight_init(m):
+    """Custom weight init for Conv2D and Linear layers."""
+    if isinstance(m, nn.Linear):
+        nn.init.orthogonal_(m.weight.data)
+        m.bias.data.fill_(0.0)
+    elif isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+        # delta-orthogonal init from https://arxiv.org/pdf/1806.05393.pdf
+        assert m.weight.size(2) == m.weight.size(3)
+        m.weight.data.fill_(0.0)
+        m.bias.data.fill_(0.0)
+        mid = m.weight.size(2) // 2
+        gain = nn.init.calculate_gain('relu')
+        nn.init.orthogonal_(m.weight.data[:, :, mid, mid], gain)
+
+
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Actor(nn.Module):
-    def __init__(self, encoder, latent_dim, action_dim):
+    def __init__(self, latent_dim, action_dim):
         super(Actor, self).__init__()
 
-        self.encoder_net = encoder
+        self.encoder_net = Encoder(latent_dim)
         self.act_net = nn.Sequential(
-            nn.Linear(latent_dim, 128),
+            nn.Linear(latent_dim, 32),
             nn.ReLU(),
-            nn.Linear(128, 64),
+            nn.Linear(32, 32),
             nn.ReLU(),
-            nn.Linear(64, 32),
+            nn.Linear(32, 32),
             nn.ReLU(),
             nn.Linear(32, action_dim),
         )
+        self.apply(weight_init)
 
     def forward(self, state, detach_encoder=False):
         z_vector = self.encoder_net(state, detach_encoder)
@@ -141,31 +192,28 @@ class Actor(nn.Module):
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Critic(nn.Module):
-    def __init__(self, encoder, latent_dim, action_dim):
+    def __init__(self, latent_dim, action_dim):
         super(Critic, self).__init__()
 
-        self.encoder_net  = encoder
+        self.encoder_net  = Encoder(latent_dim)
         input_critic_size = latent_dim + action_dim
 
         self.Q1 = nn.Sequential(
-            nn.Linear(input_critic_size, 128),
+            nn.Linear(input_critic_size, 32),
             nn.ReLU(),
-            nn.Linear(128, 64),
+            nn.Linear(32, 32),
             nn.ReLU(),
-            nn.Linear(64, 32),
+            nn.Linear(32, 1),
+        )
+        self.Q2 = nn.Sequential(
+            nn.Linear(input_critic_size, 32),
+            nn.ReLU(),
+            nn.Linear(32, 32),
             nn.ReLU(),
             nn.Linear(32, 1),
         )
 
-        self.Q2 = nn.Sequential(
-            nn.Linear(input_critic_size, 128),
-            nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, 32),
-            nn.ReLU(),
-            nn.Linear(32, 1),
-        )
+        self.apply(weight_init)
 
     def forward(self, state, action, detach_encoder=False):
         z_vector = self.encoder_net.forward(state, detach_encoder)
@@ -183,50 +231,61 @@ class RLAgent:
         self.encoder_lr = 1e-3
         self.decoder_lr = 1e-3
 
-        self.critic_lr  = 1e-3
-        self.actor_lr   = 1e-4
-
-        self.gamma = 0.99
+        self.critic_lr  = 1e-3  # 1e-3
+        self.actor_lr   = 1e-4  # 1e-4
 
         self.tau         = 0.005
         self.tau_encoder = 0.001
+        self.gamma       = 0.99
 
         self.update_counter     = 0
         self.policy_freq_update = 2
 
-        self.batch_size = 8
-        self.latent_dim = 50  # todo play with this number
+        self.batch_size = 32  # 32
+        self.latent_dim = 50  # 50 todo play with this number
         self.action_dim = 1
 
         # load and create models
         self.memory = Memory()
 
-        self.encoder = Encoder(self.latent_dim).to(device)
+        self.actor  = Actor(self.latent_dim, self.action_dim).to(device)
+        self.critic = Critic(self.latent_dim, self.action_dim).to(device)
+
+        self.actor_target  = Actor(self.latent_dim, self.action_dim).to(device)
+        self.critic_target = Critic(self.latent_dim, self.action_dim).to(device)
+
+        # tie encoders between actor and critic
+        self.actor.encoder_net.copy_conv_weights_from(self.critic.encoder_net)
+
+        self.critic_target.load_state_dict(self.critic.state_dict())
+        self.actor_target.load_state_dict(self.actor.state_dict())
+
         self.decoder = Decoder(self.latent_dim).to(device)
 
-        self.actor  = Actor(self.encoder, self.latent_dim, self.action_dim).to(device)
-        self.critic = Critic(self.encoder, self.latent_dim, self.action_dim).to(device)
-
-        self.actor_target  = copy.deepcopy(self.actor)
-        self.critic_target = copy.deepcopy(self.critic)
-        '''
-        self.encoder_critic = Encoder(self.latent_dim).to(device)
-        self.encoder_actor  = Encoder(self.latent_dim).to(device)
-        self.encoder_actor.cov_net.load_state_dict(self.encoder_critic.cov_net.state_dict())
-        self.actor  = Actor(self.encoder_actor, self.latent_dim, self.action_dim).to(device)
-        self.critic = Critic(self.encoder_critic, self.latent_dim, self.action_dim).to(device)
-        self.actor_target  = copy.deepcopy(self.actor)
-        self.critic_target = copy.deepcopy(self.critic)
-        self.decoder = Decoder(self.latent_dim).to(device)
-        '''
         # Check params
-        #for p1, p2 in zip(self.actor_target.encoder_net.parameters(), self.actor.encoder_net.parameters()):
+        #for p1, p2 in zip(self.critic.encoder_net.cov_net.parameters(), self.actor_target.encoder_net.cov_net.parameters()):
             #print(torch.equal(p1, p2))
 
-        self.encoder_optimizer = torch.optim.Adam(self.encoder.parameters(), lr=self.encoder_lr)
+        '''
+        self.encoder = Encoder(self.latent_dim).to(device)
+        self.actor_target  = Actor(self.encoder, self.latent_dim, self.action_dim).to(device)
+        self.critic_target = Critic(self.encoder, self.latent_dim, self.action_dim).to(device)
+
+        for target_param, param in zip(self.actor_target.parameters(), self.actor.parameters()):
+            target_param.data.copy_(param.data)
+
+        for target_param, param in zip(self.critic_target.parameters(), self.critic.parameters()):
+            target_param.data.copy_(param.data)
+
+        # Check params
+        #for p1, p2 in zip(self.actor.encoder_net.parameters(), self.critic_target.encoder_net.parameters()):
+            #print(torch.equal(p1, p2))
+        '''
+
+        self.encoder_optimizer = torch.optim.Adam(self.critic.encoder_net.parameters(), lr=self.encoder_lr)
         self.decoder_optimizer = torch.optim.Adam(self.decoder.parameters(), lr=self.decoder_lr, weight_decay=1e-7)
+        self.critic_optimizer  = torch.optim.Adam(self.critic.parameters(), lr=self.critic_lr)
         self.actor_optimizer   = torch.optim.Adam(self.actor.parameters(),   lr=self.actor_lr)
-        self.critic_optimizer  = torch.optim.Adam(self.critic.parameters(),  lr=self.critic_lr)
 
 
     def update_function(self):
@@ -234,13 +293,30 @@ class RLAgent:
             return
         else:
             for _ in range(1, self.G+1):
+
                 self.update_counter += 1
 
                 state_batch, actions_batch, rewards_batch, next_states_batch, dones_batch = self.memory.sample_experiences_from_buffer(self.batch_size)
 
-                '''
+                # Update the autoencoder part
+                z_vector = self.critic.encoder_net(state_batch, detach_encoder=False)
+                rec_obs  = self.decoder(z_vector)
+
+                rec_loss    = F.mse_loss(state_batch, rec_obs)
+                latent_loss = (0.5 * z_vector.pow(2).sum(1)).mean()  # add L2 penalty on latent representation
+
+                ae_loss = rec_loss + 1e-6 * latent_loss
+
+                self.encoder_optimizer.zero_grad()
+                self.decoder_optimizer.zero_grad()
+                ae_loss.backward()
+                self.encoder_optimizer.step()
+                self.decoder_optimizer.step()
+
+                #print("Rec Loss:", rec_loss.item(), "Latent Loss:", latent_loss.item())
                 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
-                # first update the critic part
+
+                # update the critic part
                 with torch.no_grad():
                     next_actions = self.actor_target.forward(next_states_batch)
                     target_noise = 0.2 * torch.randn_like(next_actions)
@@ -249,8 +325,8 @@ class RLAgent:
                     next_actions = next_actions.clamp_(-2, 2)
 
                     next_q_values_q1, next_q_values_q2 = self.critic_target.forward(next_states_batch, next_actions)
-
                     q_min    = torch.minimum(next_q_values_q1, next_q_values_q2)
+
                     q_target = rewards_batch + (self.gamma * (1 - dones_batch) * q_min)
 
                 q1, q2 = self.critic.forward(state_batch, actions_batch, detach_encoder=False)
@@ -262,12 +338,12 @@ class RLAgent:
                 self.critic_optimizer.zero_grad()
                 critic_loss_total.backward()
                 self.critic_optimizer.step()
-
                 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
                 # Update the actor and soft updates of targets networks
                 if self.update_counter % self.policy_freq_update == 0:
                     action_actor       = self.actor.forward(state_batch, detach_encoder=True)
-                    actor_q1, actor_q2 = self.critic.forward(state_batch, action_actor, detach_encoder=True)
+                    actor_q1, actor_q2 = self.critic.forward(state_batch, action_actor, detach_encoder=True)  # try with False too, maybe
 
                     actor_q_min = torch.minimum(actor_q1, actor_q2)
                     actor_loss  = - actor_q_min.mean()
@@ -275,58 +351,33 @@ class RLAgent:
                     self.actor_optimizer.zero_grad()
                     actor_loss.backward()
                     self.actor_optimizer.step()
-
                     # ------------------------------------- Update target networks --------------- #
-                    for target_param, param in zip(self.actor_target.encoder_net.parameters(), self.actor.encoder_net.parameters()):
-                        target_param.data.copy_(param.data)
 
-                    for target_param, param in zip(self.critic_target.encoder_net.parameters(), self.critic.encoder_net.parameters()):
-                        target_param.data.copy_(param.data)
-
-                    # ------------------------------------- Update target networks --------------- #
                     for target_param, param in zip(self.critic_target.Q1.parameters(), self.critic.Q1.parameters()):
                         target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
 
                     for target_param, param in zip(self.critic_target.Q2.parameters(), self.critic.Q2.parameters()):
                         target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
 
-                    for target_param, param in zip(self.actor_target.act_net.parameters(), self.actor.act_net.parameters()):
+                    for target_param, param in zip(self.critic.encoder_net.parameters(), self.critic_target.encoder_net.parameters()):
+                        target_param.data.copy_(param.data * self.tau_encoder + target_param.data * (1.0 - self.tau_encoder))
+
+                    for target_param, param in zip(self.actor.encoder_net.parameters(), self.actor_target.encoder_net.parameters()):
+                        target_param.data.copy_(param.data * self.tau_encoder + target_param.data * (1.0 - self.tau_encoder))
+
+                    '''
+                    for target_param, param in zip(self.actor_target.parameters(), self.actor.parameters()):
+                        target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
+
+                    for target_param, param in zip(self.critic_target.parameters(), self.critic.parameters()):
                         target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
                     '''
                 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                # Update the autoencoder part
-                z_vector = self.encoder.forward(state_batch, detach_encoder=False)
-                rec_obs  = self.decoder(z_vector)
-
-                bits = 5
-                bins = 2 ** bits
-                obs = torch.floor(state_batch / 2 ** (8 - bits))
-                obs = obs / bins
-                obs = obs + torch.rand_like(obs) / bins
-                obs = obs - 0.5
-                targets = obs
-
-                rec_loss    = F.mse_loss(targets, rec_obs)
-                latent_loss = (0.5 * z_vector.pow(2).sum(1)).mean()  # add L2 penalty on latent representation
-
-                print("Rec Loss:", rec_loss.item(), "Latent Loss:", latent_loss.item())
-
-                ae_loss = rec_loss  + 1e-6 * latent_loss
-
-                self.encoder_optimizer.zero_grad()
-                self.decoder_optimizer.zero_grad()
-                ae_loss.backward()
-                self.encoder_optimizer.step()
-                self.decoder_optimizer.step()
-
-                print(ae_loss.item())
-
-                # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     def select_action_from_policy(self, state_image_pixel):
         state_image_tensor  = torch.FloatTensor(state_image_pixel)
-        state_image_tensor  = state_image_tensor.unsqueeze(0)  # torch.Size([1, 64, 64, 3])
-        state_image_tensor  = state_image_tensor.permute(0, 3, 1, 2).to(device)  # torch.Size([1, 3, 64, 64])
+        state_image_tensor  = state_image_tensor.unsqueeze(0)  # torch.Size([1, 84, 84, 3])
+        state_image_tensor  = state_image_tensor.permute(0, 3, 1, 2).to(device)  # torch.Size([1, 3, 84, 84])
         with torch.no_grad():
             action = self.actor.forward(state_image_tensor, detach_encoder=True)
             action = action.cpu().data.numpy()
@@ -338,7 +389,7 @@ class RLAgent:
 def pre_pro_image(image_array):
     resized     = cv2.resize(image_array, (84, 84), interpolation=cv2.INTER_AREA)
     norm_image  = resized / 255.0
-    state_image = norm_image  # (64, 64, 3)
+    state_image = norm_image
     return state_image
 
 def plot_reward(reward_vector):
@@ -367,7 +418,7 @@ def run_random_exploration(env, agent,  num_exploration_episodes=50, episode_hor
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-def run_training_rl_method(env, agent, num_episodes_training=500, episode_horizont=200):
+def run_training_rl_method(env, agent, num_episodes_training=200, episode_horizont=200):
     total_reward = []
     for episode in range(1, num_episodes_training + 1):
         env.reset()
@@ -390,7 +441,8 @@ def run_training_rl_method(env, agent, num_episodes_training=500, episode_horizo
             agent.update_function()
         total_reward.append(episode_reward)
         print(f"Episode {episode} End, Total reward: {episode_reward}")
-    #plot_reward(total_reward)
+    plot_reward(total_reward)
+
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -403,9 +455,8 @@ def evaluation(env, agent):
     state_image_tensor = state_image_tensor.unsqueeze(0)  # torch.Size([1, 84, 84, 3])
     state_image_tensor = state_image_tensor.permute(0, 3, 1, 2).to(device)  # torch.Size([1, 3, 84, 84])
     with torch.no_grad():
-        z_vector = agent.encoder.forward(state_image_tensor, detach_encoder=False)
+        z_vector = agent.critic.encoder_net(state_image_tensor, detach_encoder=False)
         rec_obs  = agent.decoder(z_vector)
-
     rec_obs = rec_obs.permute(0, 2, 3, 1)
     rec_obs = rec_obs.cpu().numpy()
     plt.imshow(rec_obs[0])
@@ -415,8 +466,7 @@ def evaluation(env, agent):
 def main():
     env   = gym.make('Pendulum-v1')
     agent = RLAgent()
-
-    #run_random_exploration(env, agent)
+    run_random_exploration(env, agent)
     run_training_rl_method(env, agent)
     evaluation(env, agent)
     env.close()
