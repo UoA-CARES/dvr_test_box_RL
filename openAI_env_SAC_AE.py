@@ -274,7 +274,7 @@ class RLAgent:
 
         encoder_lr = 1e-3
         decoder_lr = 1e-3
-        actor_lr   = 1e-4
+        actor_lr   = 1e-3
         critic_lr  = 1e-3
 
         self.G = 1
@@ -283,7 +283,8 @@ class RLAgent:
 
         self.device = device
         self.gamma = 0.99
-        self.tau = 0.005
+
+        self.tau         = 0.005
         self.tau_encoder = 0.001
 
         self.memory = Memory(replay_max_size=40_000, device=self.device)
@@ -318,7 +319,7 @@ class RLAgent:
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=actor_lr, betas=(0.9, 0.999))
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=critic_lr, betas=(0.9, 0.999))
 
-        self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=1e-3, betas=(0.9, 0.999))
+        self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=1e-4, betas=(0.9, 0.999))
 
         self.actor.train(True)
         self.critic.train(True)
@@ -430,7 +431,7 @@ def run_training_rl_method(env, agent, num_episodes_training=1000, episode_horiz
         for step in range(1, episode_horizont + 1):
             pass
             # action = env.action_space.sample()
-            action = agent.select_action_from_policy(state_image)  # todo OJO la actiona aun no esta en rango
+            action = agent.select_action_from_policy(state_image)
             obs_next_state_vector, reward, done, info = env.step(action)
             new_state_image = env.render(mode='rgb_array')
             new_state_image = pre_pro_image(new_state_image)
@@ -445,6 +446,24 @@ def run_training_rl_method(env, agent, num_episodes_training=1000, episode_horiz
     plot_reward(total_reward)
 
 
+def run_random_exploration(env, agent,  num_exploration_episodes=200, episode_horizont=200):
+    print("exploration start")
+    for episode in range(1, num_exploration_episodes + 1):
+        env.reset()
+        state_image = env.render(mode='rgb_array')  # return the rendered image and can be used as input-state image
+        state_image = pre_pro_image(state_image)
+        for step in range(1, episode_horizont + 1):
+            action = env.action_space.sample()
+            obs_next_state_vector, reward, done, _ = env.step(action)
+            new_state_image = env.render(mode='rgb_array')
+            new_state_image = pre_pro_image(new_state_image)
+            agent.memory.save_experience_to_buffer(state_image, action, reward, new_state_image, done)
+            state_image = new_state_image
+            if done:
+                break
+    print("exploration end")
+
+
 def main():
     env = gym.make('Pendulum-v1')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -456,8 +475,9 @@ def main():
     action_shape = env.action_space.shape  # --> 1
 
     agent = RLAgent(device)
-
+    run_random_exploration(env, agent)
     run_training_rl_method(env, agent)
+    env.close()
 
 
 if __name__ == '__main__':
