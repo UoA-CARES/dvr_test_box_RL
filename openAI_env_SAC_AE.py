@@ -11,7 +11,7 @@ import random
 
 class Memory:
     def __init__(self, replay_max_size=40_000, device="gpu"):
-        self.device = device
+        self.device          = device
         self.replay_max_size = replay_max_size
         self.memory_buffer   = deque(maxlen=replay_max_size)
 
@@ -48,10 +48,45 @@ class Memory:
         next_batch_state_tensor = torch.FloatTensor(next_state_batch).to(self.device)
 
         # just put in the right order [b, 3, H, W]
-        state_batch_tensor      = state_batch_tensor.permute(0, 3, 1, 2)
-        next_batch_state_tensor = next_batch_state_tensor.permute(0, 3, 1, 2)
+        #state_batch_tensor      = state_batch_tensor.permute(0, 3, 1, 2)
+        #next_batch_state_tensor = next_batch_state_tensor.permute(0, 3, 1, 2)
 
         return state_batch_tensor, action_batch_tensor, reward_batch_tensor, next_batch_state_tensor, done_batch_tensor
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+class FrameStack:
+    def __init__(self, k=3, env=gym.make('Pendulum-v1')):
+        self.k = k
+        self.frames_stacked = deque([], maxlen=k)
+        self.env = env
+
+    def reset(self):
+        self.env.reset()
+        obs = self.env.render(mode='rgb_array')
+        obs = self.pre_pro_image(obs)
+        for _ in range(self.k):
+            self.frames_stacked.append(obs)
+        #stacked_vector = np.concatenate(list(self.frames_stacked), axis=0)
+        stacked_vector = np.array(list(self.frames_stacked))
+        return stacked_vector
+
+    def step(self, action):
+        _, reward, done, info = self.env.step(action)
+        obs = self.env.render(mode='rgb_array')
+        obs = self.pre_pro_image(obs)
+        self.frames_stacked.append(obs)
+        stacked_vector = np.array(list(self.frames_stacked))
+        #stacked_vector = np.concatenate(list(self.frames_stacked), axis=0)
+        return stacked_vector, reward, done, info
+
+    def pre_pro_image(self, image_array):
+        resized = cv2.resize(image_array, (84, 84), interpolation=cv2.INTER_AREA)
+        gray_image = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+        norm_image = cv2.normalize(gray_image, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+        state_image = norm_image
+        return state_image
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 def tie_weights(src, trg):
@@ -179,7 +214,7 @@ class Actor(nn.Module):
 
         self.encoder = Encoder(encoder_feature_dim)
 
-        self.log_std_min = -10
+        self.log_std_min = -20
         self.log_std_max = 2
 
         action_shape = 1
@@ -203,11 +238,11 @@ class Actor(nn.Module):
         log_std = torch.tanh(log_std)
         log_std = self.log_std_min + 0.5 * (self.log_std_max - self.log_std_min) * (log_std + 1)
 
-        self.outputs['mu'] = mu
+        self.outputs['mu']  = mu
         self.outputs['std'] = log_std.exp()
 
         if compute_pi:
-            std = log_std.exp()
+            std   = log_std.exp()
             noise = torch.randn_like(mu)
             pi = mu + noise * std
         else:
@@ -221,7 +256,7 @@ class Actor(nn.Module):
 
         mu, pi, log_pi = squash(mu, pi, log_pi)
 
-        mu = mu * 2 # this is for pendulum only
+        mu = mu * 2.0  # this is for pendulum only
 
         return mu, pi, log_pi, log_std
 
@@ -259,8 +294,8 @@ class Critic(nn.Module):
 
     def forward(self, obs, action, detach_encoder=False):
         obs = self.encoder(obs, detach=detach_encoder)
-        q1 = self.Q1(obs, action)
-        q2 = self.Q2(obs, action)
+        q1  = self.Q1(obs, action)
+        q2  = self.Q2(obs, action)
 
         self.outputs['q1'] = q1
         self.outputs['q2'] = q2
@@ -274,15 +309,16 @@ class RLAgent:
 
         encoder_lr = 1e-3
         decoder_lr = 1e-3
+
         actor_lr   = 1e-3
         critic_lr  = 1e-3
 
         self.G = 1
-        self.update_counter = 0
+        self.update_counter     = 0
         self.policy_freq_update = 2
 
         self.device = device
-        self.gamma = 0.99
+        self.gamma  = 0.99
 
         self.tau         = 0.005
         self.tau_encoder = 0.001
@@ -319,7 +355,7 @@ class RLAgent:
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=actor_lr, betas=(0.9, 0.999))
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=critic_lr, betas=(0.9, 0.999))
 
-        self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=1e-4, betas=(0.9, 0.999))
+        self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=1e-3, betas=(0.9, 0.999))
 
         self.actor.train(True)
         self.critic.train(True)
@@ -334,8 +370,8 @@ class RLAgent:
     def select_action_from_policy(self, obs):
         with torch.no_grad():
             obs = torch.FloatTensor(obs)
-            obs = obs.unsqueeze(0)
-            obs = obs.permute(0, 3, 1, 2).to(self.device)  # torch.Size([1, 3, 84, 84])
+            obs = obs.unsqueeze(0).to(self.device)
+            #obs = obs.permute(0, 3, 1, 2).to(self.device)  # torch.Size([1, 3, 84, 84])
             mu, _, _, _ = self.actor(obs, compute_pi=False, compute_log_pi=False)
             action = mu.cpu().data.numpy().flatten()
         return action
@@ -345,7 +381,6 @@ class RLAgent:
             return
         else:
             for _ in range(1, self.G+1):
-
                 self.update_counter += 1
 
                 state_batch, actions_batch, rewards_batch, next_states_batch, dones_batch = self.memory.sample_experiences_from_buffer(self.batch_size)
@@ -354,7 +389,7 @@ class RLAgent:
                     _, policy_action, log_pi, _ = self.actor(next_states_batch)
                     target_Q1, target_Q2        = self.critic_target(next_states_batch, policy_action)
                     target_V = torch.min(target_Q1, target_Q2) - self.alpha.detach() * log_pi
-                    target_Q = rewards_batch + ((1 - dones_batch) * self.gamma * target_V)
+                    target_Q = rewards_batch + (1 - dones_batch) * self.gamma * target_V
 
                 current_Q1, current_Q2 = self.critic(state_batch, actions_batch)
                 critic_loss = F.mse_loss(current_Q1, target_Q) + F.mse_loss(current_Q2, target_Q)
@@ -367,11 +402,8 @@ class RLAgent:
                 if self.update_counter % self.policy_freq_update == 0:
                     _, pi, log_pi, log_std = self.actor(state_batch, detach_encoder=True)
                     actor_Q1, actor_Q2     = self.critic(state_batch, pi, detach_encoder=True)
-
-                    actor_Q    = torch.min(actor_Q1, actor_Q2)
-                    actor_loss = (self.alpha.detach() * log_pi - actor_Q).mean()
-
-                    entropy = 0.5 * log_std.shape[1] * (1.0 + np.log(2 * np.pi)) + log_std.sum(dim=-1)
+                    actor_Q                = torch.min(actor_Q1, actor_Q2)
+                    actor_loss             = (self.alpha.detach() * log_pi - actor_Q).mean()
 
                     self.actor_optimizer.zero_grad()
                     actor_loss.backward()
@@ -391,7 +423,6 @@ class RLAgent:
                     for param, target_param in zip(self.critic.encoder.parameters(), self.critic_target.encoder.parameters()):
                         target_param.data.copy_(self.tau_encoder * param.data + (1 - self.tau_encoder) * target_param.data)
 
-
                 h = self.critic.encoder(state_batch)
                 rec_obs = self.decoder(h)
 
@@ -405,6 +436,7 @@ class RLAgent:
                 loss.backward()
                 self.encoder_optimizer.step()
                 self.decoder_optimizer.step()
+
 
 def pre_pro_image(image_array, bits=5):
     resized     = cv2.resize(image_array, (84, 84), interpolation=cv2.INTER_AREA)
@@ -421,20 +453,23 @@ def plot_reward(reward_vector):
     plt.show()
 
 
-def run_training_rl_method(env, agent, num_episodes_training=1000, episode_horizont=200):
+def run_training_rl_method(env, agent, frames_stack, num_episodes_training=2000, episode_horizont=200):
     total_reward = []
     for episode in range(1, num_episodes_training + 1):
-        env.reset()
-        state_image = env.render(mode='rgb_array')
-        state_image = pre_pro_image(state_image)
+        #env.reset()
+        #state_image = env.render(mode='rgb_array')
+        #state_image = pre_pro_image(state_image)
+        state_image = frames_stack.reset()
         episode_reward = 0
         for step in range(1, episode_horizont + 1):
-            pass
             # action = env.action_space.sample()
             action = agent.select_action_from_policy(state_image)
-            obs_next_state_vector, reward, done, info = env.step(action)
-            new_state_image = env.render(mode='rgb_array')
-            new_state_image = pre_pro_image(new_state_image)
+
+            #obs_next_state_vector, reward, done, info = env.step(action)
+            #new_state_image = env.render(mode='rgb_array')
+            #new_state_image = pre_pro_image(new_state_image)
+            new_state_image, reward, done, _ = frames_stack.step(action)
+
             agent.memory.save_experience_to_buffer(state_image, action, reward, new_state_image, done)
             state_image = new_state_image
             episode_reward += reward
@@ -446,17 +481,18 @@ def run_training_rl_method(env, agent, num_episodes_training=1000, episode_horiz
     plot_reward(total_reward)
 
 
-def run_random_exploration(env, agent,  num_exploration_episodes=200, episode_horizont=200):
+def run_random_exploration(env, agent, frames_stack,  num_exploration_episodes=200, episode_horizont=200):
     print("exploration start")
     for episode in range(1, num_exploration_episodes + 1):
-        env.reset()
-        state_image = env.render(mode='rgb_array')  # return the rendered image and can be used as input-state image
-        state_image = pre_pro_image(state_image)
+        #env.reset()
+        #state_image = env.render(mode='rgb_array')  # return the rendered image and can be used as input-state image
+        #state_image = pre_pro_image(state_image)
+        state_image = frames_stack.reset()
         for step in range(1, episode_horizont + 1):
             action = env.action_space.sample()
-            obs_next_state_vector, reward, done, _ = env.step(action)
-            new_state_image = env.render(mode='rgb_array')
-            new_state_image = pre_pro_image(new_state_image)
+            new_state_image, reward, done, _ = frames_stack.step(action)
+            #new_state_image = env.render(mode='rgb_array')
+            #new_state_image = pre_pro_image(new_state_image)
             agent.memory.save_experience_to_buffer(state_image, action, reward, new_state_image, done)
             state_image = new_state_image
             if done:
@@ -475,8 +511,9 @@ def main():
     action_shape = env.action_space.shape  # --> 1
 
     agent = RLAgent(device)
-    run_random_exploration(env, agent)
-    run_training_rl_method(env, agent)
+    frames_stack = FrameStack(env=env)
+    run_random_exploration(env, agent, frames_stack)
+    run_training_rl_method(env, agent, frames_stack)
     env.close()
 
 
