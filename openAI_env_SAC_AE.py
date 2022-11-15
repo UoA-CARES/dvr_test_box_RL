@@ -362,6 +362,7 @@ class RLAgent:
         self.decoder.train(True)
         self.critic_target.train(True)
 
+
     @property
     def alpha(self):
         return self.log_alpha.exp()
@@ -399,6 +400,7 @@ class RLAgent:
                 critic_loss.backward()
                 self.critic_optimizer.step()
 
+
                 if self.update_counter % self.policy_freq_update == 0:
                     _, pi, log_pi, log_std = self.actor(state_batch, detach_encoder=True)
                     actor_Q1, actor_Q2     = self.critic(state_batch, pi, detach_encoder=True)
@@ -422,6 +424,7 @@ class RLAgent:
 
                     for param, target_param in zip(self.critic.encoder.parameters(), self.critic_target.encoder.parameters()):
                         target_param.data.copy_(self.tau_encoder * param.data + (1 - self.tau_encoder) * target_param.data)
+
 
                 h = self.critic.encoder(state_batch)
                 rec_obs = self.decoder(h)

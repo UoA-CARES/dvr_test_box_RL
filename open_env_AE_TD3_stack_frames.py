@@ -100,6 +100,12 @@ class FrameStack:
         state_image = norm_image
         return state_image
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+def tie_weights(src, trg):
+    assert type(src) == type(trg)
+    trg.weight = src.weight
+    trg.bias = src.bias
+
 def weight_init(m):
     """Custom weight init for Conv2D and Linear layers."""
     if isinstance(m, nn.Linear):
@@ -113,53 +119,23 @@ def weight_init(m):
         mid = m.weight.size(2) // 2
         gain = nn.init.calculate_gain('relu')
         nn.init.orthogonal_(m.weight.data[:, :, mid, mid], gain)
-
-
-def tie_weights(src, trg):
-    assert type(src) == type(trg)
-    trg.weight = src.weight
-    trg.bias = src.bias
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-class Encoder(nn.Module):
-    def __init__(self, latent_dim):
-        super(Encoder, self).__init__()
-        self.cov_net = nn.ModuleList([nn.Conv2d(3,  32, 3, stride=2),
-                                      nn.Conv2d(32, 32, 3, stride=1),
-                                      nn.Conv2d(32, 32, 3, stride=1),
-                                      nn.Conv2d(32, 32, 3, stride=1),
-                                      ])
-        self.fc  = nn.Linear(39200, latent_dim)
-        self.ln  = nn.LayerNorm(latent_dim)
-
-    def forward_conv(self, x):
-        x = torch.relu(self.cov_net[0](x))
-        x = torch.relu(self.cov_net[1](x))
-        x = torch.relu(self.cov_net[2](x))
-        x = torch.relu(self.cov_net[3](x))
-        x = torch.flatten(x, start_dim=1)
-        return x
-
-    def forward(self, x, detach_encoder=False):
-        x = self.forward_conv(x)
-        if detach_encoder:
-            x = x.detach()
-        x = self.fc(x)
-        x = self.ln(x)
-        x = torch.tanh(x)
-        return x
-
-    def copy_conv_weights_from(self, model_source):
-        for i in range(4):
-            #self.cov_net[i].weight = model_source.cov_net[i].weight
-            #self.cov_net[i].bias   = model_source.cov_net[i].bias
-            tie_weights(src=model_source.cov_net[i], trg=self.cov_net[i])
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Decoder(nn.Module):
     def __init__(self, latent_dim):
         super(Decoder, self).__init__()
+
         self.latent_dim = latent_dim
-        self.fc_1 = nn.Linear(self.latent_dim, 39200)
+
+        self.num_filters = 32
+        self.num_layers  = 4
+
+        self.fc_1    = nn.Linear(self.latent_dim, 39200)
+        self.deconvs = nn.ModuleList()
+
+        for i in range(self.num_layers - 1):
+            self.deconvs.append(nn.ConvTranspose2d(self.num_filters, self.num_filters, 3, stride=1))
+        self.deconvs.append(nn.ConvTranspose2d(self.num_filters, 3, 3, stride=2, output_padding=1))
+        '''
         self.decov_net = nn.Sequential(
             nn.ConvTranspose2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=0, output_padding=0),
             nn.ReLU(),
@@ -171,13 +147,84 @@ class Decoder(nn.Module):
             nn.Sigmoid(),  # I put sigmoid because can help to get the reconstruction  between 0~1
             # original paper no use activation function here
         )
-
+        '''
     def forward(self, x):
+        '''
         x = self.fc_1(x)
-        x = torch.relu(x)  # no sure about this activation function
+        x = torch.relu(x)
         x = x.view(-1, 32, 35, 35)
         x = self.decov_net(x)
         return x
+        '''
+        h = torch.relu(self.fc_1(x))
+        x = h.view(-1, 32, 35, 35)
+
+        for i in range(0, self.num_layers - 1):
+            x = torch.relu(self.deconvs[i](x))
+
+        obs = self.deconvs[-1](x)
+        # nota que aqui no existe funcion de activacion no estoy seguro de esto
+        return obs
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+class Encoder(nn.Module):
+    def __init__(self, latent_dim):
+        super(Encoder, self).__init__()
+
+        self.num_layers = 4
+        num_filters     = 32
+
+        self.cov_net = nn.ModuleList([nn.Conv2d(3, num_filters, 3, stride=2)])
+
+        for i in range(self.num_layers - 1):
+            self.cov_net.append(nn.Conv2d(num_filters, num_filters, 3, stride=1))
+        '''
+        self.cov_net = nn.ModuleList([nn.Conv2d(3,  32, 3, stride=2),
+                                      nn.Conv2d(32, 32, 3, stride=1),
+                                      nn.Conv2d(32, 32, 3, stride=1),
+                                      nn.Conv2d(32, 32, 3, stride=1),
+                                      ])
+        '''
+        self.fc  = nn.Linear(39200, latent_dim)
+        self.ln  = nn.LayerNorm(latent_dim)
+
+    def forward_conv(self, x):
+        '''
+        x = torch.relu(self.cov_net[0](x))
+        x = torch.relu(self.cov_net[1](x))
+        x = torch.relu(self.cov_net[2](x))
+        x = torch.relu(self.cov_net[3](x))
+        x = torch.flatten(x, start_dim=1)
+        return x
+        '''
+        conv = torch.relu(self.cov_net[0](x))
+        for i in range(1, self.num_layers):
+            conv = torch.relu(self.cov_net[i](conv))
+        h = torch.flatten(conv, start_dim=1)
+        return h
+
+    def forward(self, obs, detach=False):
+        '''
+        x = self.forward_conv(x)
+        if detach_encoder:
+            x = x.detach()
+        x = self.fc(x)
+        x = self.ln(x)
+        x = torch.tanh(x)
+        '''
+        h = self.forward_conv(obs)
+        if detach:
+            h = h.detach()
+        h_fc   = self.fc(h)
+        h_norm = self.ln(h_fc)
+        out    = torch.tanh(h_norm)
+        return out
+
+    def copy_conv_weights_from(self, model_source):
+        for i in range(self.num_layers):
+            #self.cov_net[i].weight = model_source.cov_net[i].weight
+            #self.cov_net[i].bias   = model_source.cov_net[i].bias
+            tie_weights(src=model_source.cov_net[i], trg=self.cov_net[i])
+
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Actor(nn.Module):
     def __init__(self, latent_dim, action_dim):
@@ -189,14 +236,12 @@ class Actor(nn.Module):
             nn.ReLU(),
             nn.Linear(1024, 1024),
             nn.ReLU(),
-            nn.Linear(1024, 1024),
-            nn.ReLU(),
             nn.Linear(1024, action_dim),
         )
         self.apply(weight_init)
 
     def forward(self, state, detach_encoder=False):
-        z_vector = self.encoder_net(state, detach_encoder)
+        z_vector = self.encoder_net(state, detach=detach_encoder)
         output   = self.act_net(z_vector)
         output   = torch.tanh(output)
         return output * 2.0  # 2.0 is for pendulum env range
@@ -217,8 +262,6 @@ class QFunction(nn.Module):
     def forward(self, obs, action):
         obs_action = torch.cat([obs, action], dim=1)
         return self.trunk(obs_action)
-
-
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Critic(nn.Module):
     def __init__(self, latent_dim, action_dim):
@@ -249,7 +292,7 @@ class Critic(nn.Module):
         self.apply(weight_init)
 
     def forward(self, state, action, detach_encoder=False):
-        z_vector = self.encoder_net.forward(state, detach_encoder)
+        z_vector = self.encoder_net(state, detach=detach_encoder)
         q1 = self.Q1(z_vector, action)
         q2 = self.Q2(z_vector, action)
         return q1, q2
@@ -264,7 +307,7 @@ class RLAgent:
         self.decoder_lr = 1e-3
 
         self.critic_lr  = 1e-3  # 1e-3
-        self.actor_lr   = 1e-3  # 1e-4
+        self.actor_lr   = 1e-4  # 1e-4
 
         self.tau         = 0.005
         self.tau_encoder = 0.001
@@ -307,6 +350,15 @@ class RLAgent:
         self.decoder.train(True)
 
 
+    def select_action_from_policy(self, state_image_pixel):
+        with torch.no_grad():
+            state_image_tensor  = torch.FloatTensor(state_image_pixel)
+            state_image_tensor  = state_image_tensor.unsqueeze(0).to(device)
+            #state_image_tensor  = state_image_tensor.permute(0, 3, 1, 2).to(device)
+            action = self.actor.forward(state_image_tensor)
+            action = action.cpu().data.numpy()
+        return action[0]
+
     def update_function(self):
         if len(self.memory.memory_buffer) <= self.batch_size:
             return
@@ -318,17 +370,17 @@ class RLAgent:
                 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 # update the critic part
                 with torch.no_grad():
-                    next_actions = self.actor_target.forward(next_states_batch)
+                    next_actions = self.actor_target(next_states_batch)
                     target_noise = 0.2 * torch.randn_like(next_actions)
                     target_noise = target_noise.clamp_(-0.5, 0.5)
                     next_actions = next_actions + target_noise
                     next_actions = next_actions.clamp_(-2, 2)
 
-                    next_q_values_q1, next_q_values_q2 = self.critic_target.forward(next_states_batch, next_actions)
+                    next_q_values_q1, next_q_values_q2 = self.critic_target(next_states_batch, next_actions)
                     q_min = torch.minimum(next_q_values_q1, next_q_values_q2)
                     q_target = rewards_batch + (self.gamma * (1 - dones_batch) * q_min)
 
-                q1, q2 = self.critic.forward(state_batch, actions_batch, detach_encoder=False)
+                q1, q2 = self.critic(state_batch, actions_batch)
 
                 critic_loss_1 = F.mse_loss(q1, q_target)
                 critic_loss_2 = F.mse_loss(q2, q_target)
@@ -338,11 +390,12 @@ class RLAgent:
                 critic_loss_total.backward()
                 self.critic_optimizer.step()
 
+
                 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 # Update the actor and soft updates of targets networks
                 if self.update_counter % self.policy_freq_update == 0:
-                    action_actor       = self.actor.forward(state_batch, detach_encoder=True)
-                    actor_q1, actor_q2 = self.critic.forward(state_batch, action_actor, detach_encoder=True)
+                    action_actor       = self.actor(state_batch, detach_encoder=True)
+                    actor_q1, actor_q2 = self.critic(state_batch, action_actor, detach_encoder=True)
 
                     actor_q_min = torch.min(actor_q1, actor_q2)
                     actor_loss  = - actor_q_min.mean()
@@ -350,6 +403,7 @@ class RLAgent:
                     self.actor_optimizer.zero_grad()
                     actor_loss.backward()
                     self.actor_optimizer.step()
+
 
                     # ------------------------------------- Update target networks --------------- #
                     for param, target_param in zip(self.critic.Q1.parameters(), self.critic_target.Q1.parameters()):
@@ -364,10 +418,11 @@ class RLAgent:
                     for param, target_param in zip(self.actor.encoder_net.parameters(), self.actor_target.encoder_net.parameters()):
                         target_param.data.copy_(self.tau_encoder * param.data + (1 - self.tau_encoder) * target_param.data)
 
+
                 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 # Update the autoencoder part
-                z_vector = self.critic.encoder_net.forward(state_batch, detach_encoder=False)
-                rec_obs  = self.decoder.forward(z_vector)
+                z_vector = self.critic.encoder_net(state_batch)
+                rec_obs  = self.decoder(z_vector)
 
                 rec_loss = F.mse_loss(state_batch, rec_obs)
 
@@ -382,14 +437,6 @@ class RLAgent:
                 self.decoder_optimizer.step()
 
 
-    def select_action_from_policy(self, state_image_pixel):
-        state_image_tensor  = torch.FloatTensor(state_image_pixel)
-        state_image_tensor  = state_image_tensor.unsqueeze(0).to(device)
-        #state_image_tensor  = state_image_tensor.permute(0, 3, 1, 2).to(device)
-        with torch.no_grad():
-            action = self.actor.forward(state_image_tensor)
-            action = action.cpu().data.numpy()
-        return action[0]
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 def plot_reward(reward_vector):
     plt.title("Rewards")
@@ -397,7 +444,7 @@ def plot_reward(reward_vector):
     plt.show()
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-def run_random_exploration(env, agent, frames_stack, num_exploration_episodes=200, episode_horizont=200):
+def run_random_exploration(env, agent, frames_stack, num_exploration_episodes=100, episode_horizont=200):
     print("exploration start")
     for episode in tqdm(range(1, num_exploration_episodes + 1)):
         state_image = frames_stack.reset()
@@ -451,6 +498,7 @@ def main():
     env   = gym.make('Pendulum-v1')
     agent = RLAgent()
     frames_stack = FrameStack(env=env)
+
     run_random_exploration(env, agent, frames_stack)
     run_training_rl_method(env, agent, frames_stack)
     evaluation(env, agent, frames_stack)
