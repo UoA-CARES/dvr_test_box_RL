@@ -156,6 +156,7 @@ class Decoder(nn.Module):
             self.outputs['deconv%s' % (i + 1)] = x
 
         obs = self.deconvs[-1](x)
+        obs = torch.sigmoid(obs)  # original paper no use activation function here. I added it
         self.outputs['obs'] = obs
         return obs
 
@@ -400,7 +401,6 @@ class RLAgent:
                 critic_loss.backward()
                 self.critic_optimizer.step()
 
-
                 if self.update_counter % self.policy_freq_update == 0:
                     _, pi, log_pi, log_std = self.actor(state_batch, detach_encoder=True)
                     actor_Q1, actor_Q2     = self.critic(state_batch, pi, detach_encoder=True)
@@ -456,7 +456,7 @@ def plot_reward(reward_vector):
     plt.show()
 
 
-def run_training_rl_method(env, agent, frames_stack, num_episodes_training=2000, episode_horizont=200):
+def run_training_rl_method(env, agent, frames_stack, num_episodes_training=400, episode_horizont=200):
     total_reward = []
     for episode in range(1, num_episodes_training + 1):
         #env.reset()
@@ -484,7 +484,7 @@ def run_training_rl_method(env, agent, frames_stack, num_episodes_training=2000,
     plot_reward(total_reward)
 
 
-def run_random_exploration(env, agent, frames_stack,  num_exploration_episodes=200, episode_horizont=200):
+def run_random_exploration(env, agent, frames_stack,  num_exploration_episodes=100, episode_horizont=200):
     print("exploration start")
     for episode in range(1, num_exploration_episodes + 1):
         #env.reset()

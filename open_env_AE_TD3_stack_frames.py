@@ -24,6 +24,7 @@ else:
     print("Working with CPU")
 
 
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Memory:
     def __init__(self, replay_max_size=40_000):
         self.replay_max_size = replay_max_size
@@ -64,20 +65,19 @@ class Memory:
         # just put in the right order [b, H*, W, C] --->  [b, c, H*, W]
         #state_batch_tensor      = state_batch_tensor.permute(0, 3, 1, 2)
         #next_batch_state_tensor = next_batch_state_tensor.permute(0, 3, 1, 2)
-
         return state_batch_tensor, action_batch_tensor, reward_batch_tensor, next_batch_state_tensor, done_batch_tensor
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class FrameStack:
     def __init__(self, k=3, env=gym.make('Pendulum-v1')):
-        self.k = k
-        self.frames_stacked = deque([], maxlen=k)
         self.env = env
+        self.k   = k  # number of frames stacked
+        self.frames_stacked = deque([], maxlen=k)
 
     def reset(self):
         self.env.reset()
         obs = self.env.render(mode='rgb_array')
-        obs = self.pre_pro_image(obs)
+        obs = self.preprocessing_image(obs)
         for _ in range(self.k):
             self.frames_stacked.append(obs)
         #stacked_vector = np.concatenate(list(self.frames_stacked), axis=0)
@@ -87,20 +87,19 @@ class FrameStack:
     def step(self, action):
         _, reward, done, info = self.env.step(action)
         obs = self.env.render(mode='rgb_array')
-        obs = self.pre_pro_image(obs)
+        obs = self.preprocessing_image(obs)
         self.frames_stacked.append(obs)
         stacked_vector = np.array(list(self.frames_stacked))
         #stacked_vector = np.concatenate(list(self.frames_stacked), axis=0)
         return stacked_vector, reward, done, info
 
-    def pre_pro_image(self, image_array):
-        resized = cv2.resize(image_array, (84, 84), interpolation=cv2.INTER_AREA)
-        gray_image = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
-        norm_image = cv2.normalize(gray_image, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+    def preprocessing_image(self, image_array):
+        resized     = cv2.resize(image_array, (84, 84), interpolation=cv2.INTER_AREA)
+        gray_image  = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+        norm_image  = cv2.normalize(gray_image, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
         state_image = norm_image
         return state_image
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 def tie_weights(src, trg):
     assert type(src) == type(trg)
     trg.weight = src.weight
@@ -119,52 +118,53 @@ def weight_init(m):
         mid = m.weight.size(2) // 2
         gain = nn.init.calculate_gain('relu')
         nn.init.orthogonal_(m.weight.data[:, :, mid, mid], gain)
+
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Decoder(nn.Module):
     def __init__(self, latent_dim):
         super(Decoder, self).__init__()
 
-        self.latent_dim = latent_dim
-
         self.num_filters = 32
         self.num_layers  = 4
+        self.latent_dim  = latent_dim
 
         self.fc_1    = nn.Linear(self.latent_dim, 39200)
-        self.deconvs = nn.ModuleList()
 
+        '''
+        self.deconvs = nn.ModuleList()
         for i in range(self.num_layers - 1):
             self.deconvs.append(nn.ConvTranspose2d(self.num_filters, self.num_filters, 3, stride=1))
         self.deconvs.append(nn.ConvTranspose2d(self.num_filters, 3, 3, stride=2, output_padding=1))
         '''
-        self.decov_net = nn.Sequential(
-            nn.ConvTranspose2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=0, output_padding=0),
+
+        self.deconvs = nn.Sequential(
+            nn.ConvTranspose2d(in_channels=self.num_filters, out_channels=self.num_filters, kernel_size=3, stride=1),
             nn.ReLU(),
-            nn.ConvTranspose2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=0, output_padding=0),
+            nn.ConvTranspose2d(in_channels=self.num_filters, out_channels=self.num_filters, kernel_size=3, stride=1),
             nn.ReLU(),
-            nn.ConvTranspose2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=0, output_padding=0),
+            nn.ConvTranspose2d(in_channels=self.num_filters, out_channels=self.num_filters, kernel_size=3, stride=1),
             nn.ReLU(),
-            nn.ConvTranspose2d(in_channels=32, out_channels=3, kernel_size=3, stride=2, padding=0, output_padding=1),
-            nn.Sigmoid(),  # I put sigmoid because can help to get the reconstruction  between 0~1
-            # original paper no use activation function here
+            nn.ConvTranspose2d(in_channels=self.num_filters, out_channels=3, kernel_size=3, stride=2, output_padding=1),
+            nn.Sigmoid(),  # # original paper no use activation function here. I added it
         )
-        '''
+
+
     def forward(self, x):
-        '''
-        x = self.fc_1(x)
-        x = torch.relu(x)
-        x = x.view(-1, 32, 35, 35)
-        x = self.decov_net(x)
-        return x
         '''
         h = torch.relu(self.fc_1(x))
         x = h.view(-1, 32, 35, 35)
 
         for i in range(0, self.num_layers - 1):
             x = torch.relu(self.deconvs[i](x))
-
-        obs = self.deconvs[-1](x)
-        # nota que aqui no existe funcion de activacion no estoy seguro de esto
+        obs = self.deconvs[-1](x)  # there is no activation function on the original paper
+        obs = torch.sigmoid(obs)
         return obs
+        '''
+        x = torch.relu(self.fc_1(x))
+        x = x.view(-1, 32, 35, 35)
+        x = self.deconvs(x)
+        return x
+
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Encoder(nn.Module):
     def __init__(self, latent_dim):
