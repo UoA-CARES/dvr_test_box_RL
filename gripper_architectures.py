@@ -1,6 +1,6 @@
+
 import torch
 import torch.nn as nn
-
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 def tie_weights(src, trg):
@@ -27,14 +27,14 @@ def weight_init(m):
 class Encoder(nn.Module):
     def __init__(self, latent_dim):
         super(Encoder, self).__init__()
-        self.num_layers  = 4
-        self.num_filters = 32
-        self.latent_dim  = latent_dim
+        self.num_channels = 3
+        self.num_layers   = 4
+        self.num_filters  = 32
+        self.latent_dim   = latent_dim
 
-        self.cov_net = nn.ModuleList([nn.Conv2d(3, self.num_filters, 3, stride=2)])
+        self.cov_net = nn.ModuleList([nn.Conv2d(self.num_channels, self.num_filters, 3, stride=2)])
         for i in range(self.num_layers - 1):
             self.cov_net.append(nn.Conv2d(self.num_filters, self.num_filters, 3, stride=1))
-
         self.fc  = nn.Linear(39200, self.latent_dim)
         self.ln  = nn.LayerNorm(self.latent_dim)
 
@@ -55,6 +55,7 @@ class Encoder(nn.Module):
         return out
 
     def copy_conv_weights_from(self, model_source):
+        # to tie critic encoder cov net with actor encoder cov net
         for i in range(self.num_layers):
             tie_weights(src=model_source.cov_net[i], trg=self.cov_net[i])
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
