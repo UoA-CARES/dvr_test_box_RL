@@ -1,27 +1,29 @@
 """
-SAC using the env observation, just to test if everything is ok with SAC in pendulum env
-version 2 of SAC
-the difference wrt versio one is that here there is not value function network
+SAC using the env observation space from environment
+observation_space_size = 3
+action_space_size      = 1
+SAC version 2
+the difference wrt versio one is that here there is not a value function network
 and there is an alpha value which is automatically upload
+REFERENCES CODE:
+    https://github.com/pranz24/pytorch-soft-actor-critic/blob/master/sac.py#L32
+    https://spinningup.openai.com/en/latest/algorithms/sac.html
 
-https://github.com/pranz24/pytorch-soft-actor-critic/blob/master/sac.py#L32
-
-https://spinningup.openai.com/en/latest/algorithms/sac.html
+status = working
 """
-
 import gym
 import copy
 import numpy as np
+from tqdm import tqdm
 import matplotlib.pyplot as plt
-from torch.distributions import Normal
 
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
+from torch.distributions import Normal
 
-
-from networks_architectures import SoftQNetworkSAC, PolicyNetworkSAC, PolicyNetworkSACDeterministic
 from memory_utilities import MemoryClass
+from networks_architectures import SoftQNetworkSAC, PolicyNetworkSAC, PolicyNetworkSACDeterministic
 
 
 if torch.cuda.is_available():
@@ -36,8 +38,9 @@ class SACAgent:
     def __init__(self):
         self.device = device
 
+        self.G          = 1  # internal loop for Policy update
         self.num_action = 1
-        self.z_in_size  = 3  # this is the obs space vector size
+        self.obs_size   = 3  # this is the obs space vector size
 
         # -------- Hyper-parameters --------------- #
         self.batch_size = 32
@@ -55,36 +58,34 @@ class SACAgent:
 
         self.noise = torch.Tensor(self.num_action).to(self.device)
 
-        self.G = 10  # internal loop for Policy update
-
         # -------- Helper Functions --------------- #
         self.memory = MemoryClass(self.max_memory_size)
 
-        self.soft_q_net        = SoftQNetworkSAC(self.z_in_size, self.num_action).to(self.device)  # Q function, could be considered Critic
+        self.soft_q_net        = SoftQNetworkSAC(self.obs_size, self.num_action).to(self.device)  # Q function, could be considered Critic
         self.soft_q_net_target = copy.deepcopy(self.soft_q_net)
 
-        self.policy_net = PolicyNetworkSAC(self.z_in_size, self.num_action).to(self.device)  # could be considered Actor
+        self.policy_net = PolicyNetworkSAC(self.obs_size, self.num_action).to(self.device)  # could be considered Actor
 
-        self.target_entropy = -self.num_action  # −dim(A) todo this need to be a tensor and send to device?
-        self.alpha          = 0.0  # todo check this value
+        self.target_entropy = -self.num_action  # −dim(A)
+        self.alpha          = 0.0
         self.log_alpha      = torch.zeros(1, dtype=torch.float32, requires_grad=True, device=self.device)
 
         self.soft_q_optimizer  = optim.Adam(self.soft_q_net.parameters(), lr=self.soft_q_lr)
         self.policy_optimizer  = optim.Adam(self.policy_net.parameters(), lr=self.policy_lr)
         self.alpha_optimizer   = optim.Adam([self.log_alpha], lr=self.alpha_lr)
 
-        self.policy_net_deterministic       = PolicyNetworkSACDeterministic(self.z_in_size, self.num_action).to(self.device)
+        self.policy_net_deterministic       = PolicyNetworkSACDeterministic(self.obs_size, self.num_action).to(self.device)
         self.policy_deterministic_optimizer = optim.Adam(self.policy_net_deterministic.parameters(), lr=self.policy_lr)
 
 
     def sample_from_policy(self, state):
-        mean, log_std = self.policy_net.forward(state)
+        mean, log_std = self.policy_net(state)
         std    = log_std.exp()
         normal = Normal(mean, std)
         x_t    = normal.rsample()
         y_t    = torch.tanh(x_t)
 
-        epsilon = 1e-6
+        epsilon      = 1e-6
         action_scale = 2.0
         action = y_t * action_scale
 
@@ -96,7 +97,7 @@ class SACAgent:
 
 
     def sample_from_policy_deterministic(self, state):
-        mean   = self.policy_net_deterministic.forward(state)
+        mean   = self.policy_net_deterministic(state)
         noise  = self.noise.normal_(0., std=0.1)
         noise  = noise.clamp(-0.25, 0.25)
         action = mean + noise
@@ -120,7 +121,7 @@ class SACAgent:
 
 
     def policy_deterministic_function(self):
-        # Here alpha value is no automatically adapted and so i will be not  an automatic_entropy_tuning
+        # Here alpha value is no automatically adapted so it will be not  an automatic_entropy_tuning
         if len(self.memory.memory_buffer_experiences) <= self.batch_size:
             return
         else:
@@ -229,13 +230,18 @@ class SACAgent:
     def plot_functions(self, rewards):
         plt.title("Rewards")
         plt.plot(rewards)
-        plt.savefig(f"plot_results/SAC_pendulum_curve.png")
+        plt.savefig(f"plot_results/Normal-SAC_pendulum_reward_curve.png")
+        np.savetxt(f"plot_results/Normal-SAC_pendulum_reward_curve.txt", rewards)
+
+    def save_model(self):
+        torch.save(self.policy_net.state_dict(), f'trained_models/Normal-SAC_policy_net_pendulum.pht')
+        print("models have been saved...")
 
 
 
 def run_exploration(env, agent,  num_exploration_episodes, episode_horizont):
     print("exploration start")
-    for episode in range(1, num_exploration_episodes + 1):
+    for episode in tqdm(range(1, num_exploration_episodes + 1)):
         state = env.reset()
         for step in range(1, episode_horizont):
             action = env.action_space.sample()
@@ -250,31 +256,23 @@ def run_exploration(env, agent,  num_exploration_episodes, episode_horizont):
 
 def run_training_rl_method(env, agent, num_episodes_training=100, episode_horizont=200):
     rewards = []
-
     for episode in range(1, num_episodes_training + 1):
         print(f"-----------------Episode {episode}-----------------------------")
         episode_reward = 0
         state = env.reset()
-
         for step in range(1, episode_horizont + 1):
             action = agent.get_action_from_policy(state)
             new_state, reward, done, _ = env.step(action)
             agent.memory.save_frame_vector_experience_buffer(state, action, reward, new_state, done)
             state = new_state
-
             episode_reward += reward
-
             if done:
                 break
-
             agent.update_function()
-
         rewards.append(episode_reward)
         print(f"Episode {episode} End, Total reward: {episode_reward}")
-        if episode % 50 == 0:
-            agent.plot_functions(rewards)
-
     agent.plot_functions(rewards)
+    agent.save_model()
 
 
 
@@ -282,13 +280,13 @@ def run_training_rl_method(env, agent, num_episodes_training=100, episode_horizo
 def main_run():
     env = gym.make('Pendulum-v1')
     agent = SACAgent()
-    num_episodes_exploration  = 200
-    num_episodes_training     = 1000
+
     episode_horizont          = 200
+    num_episodes_exploration  = 200
+    num_episodes_training     = 500
 
     run_exploration(env, agent, num_episodes_exploration, episode_horizont)
     run_training_rl_method(env, agent, num_episodes_training, episode_horizont)
-
     env.close()
 
 

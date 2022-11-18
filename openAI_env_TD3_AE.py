@@ -1,18 +1,30 @@
-'''
-This use a stack of 3 frames as input of autoencoder
-'''
+
+"""
+TD3 with deterministic AE for pendulum env only
+This is my version and  re-implementation of the paper  https://arxiv.org/pdf/1910.01741.pdf
+however I removed or changed many part here. The original paper use SAC
+
+Every state is rendered and passed as input to the autoencoder, after preprocessing it
+
+original image 510 x510 x 3
+Input for the encoder = 3 stacked frames, gray scalded, normalized and resized (84 , 83)
+The input is batch-size x 3 x 84 x 84, where the stacked number takes the place of the channel for covnet
+
+status = working
+keys= initial exploration is very important, the activation function in the decoder helps
+Status = Working
+"""
 
 import gym
 import cv2
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 import random
 import numpy as np
 from tqdm import tqdm
 from collections import deque
-
-import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
 
@@ -71,7 +83,7 @@ class Memory:
 class FrameStack:
     def __init__(self, k=3, env=gym.make('Pendulum-v1')):
         self.env = env
-        self.k   = k  # number of frames stacked
+        self.k   = k  # number of frames to be stacked
         self.frames_stacked = deque([], maxlen=k)
 
     def reset(self):
@@ -118,7 +130,6 @@ def weight_init(m):
         mid = m.weight.size(2) // 2
         gain = nn.init.calculate_gain('relu')
         nn.init.orthogonal_(m.weight.data[:, :, mid, mid], gain)
-
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Decoder(nn.Module):
     def __init__(self, latent_dim):
@@ -128,7 +139,7 @@ class Decoder(nn.Module):
         self.num_layers  = 4
         self.latent_dim  = latent_dim
 
-        self.fc_1    = nn.Linear(self.latent_dim, 39200)
+        self.fc_1 = nn.Linear(self.latent_dim, 39200)
 
         '''
         self.deconvs = nn.ModuleList()
@@ -145,15 +156,13 @@ class Decoder(nn.Module):
             nn.ConvTranspose2d(in_channels=self.num_filters, out_channels=self.num_filters, kernel_size=3, stride=1),
             nn.ReLU(),
             nn.ConvTranspose2d(in_channels=self.num_filters, out_channels=3, kernel_size=3, stride=2, output_padding=1),
-            nn.Sigmoid(),  # # original paper no use activation function here. I added it
+            nn.Sigmoid(),  # original paper no use activation function here. I added it and helps
         )
-
 
     def forward(self, x):
         '''
         h = torch.relu(self.fc_1(x))
         x = h.view(-1, 32, 35, 35)
-
         for i in range(0, self.num_layers - 1):
             x = torch.relu(self.deconvs[i](x))
         obs = self.deconvs[-1](x)  # there is no activation function on the original paper
@@ -164,38 +173,23 @@ class Decoder(nn.Module):
         x = x.view(-1, 32, 35, 35)
         x = self.deconvs(x)
         return x
-
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Encoder(nn.Module):
     def __init__(self, latent_dim):
         super(Encoder, self).__init__()
 
-        self.num_layers = 4
-        num_filters     = 32
+        self.num_layers  = 4
+        self.num_filters = 32
+        self.latent_dim  = latent_dim
 
-        self.cov_net = nn.ModuleList([nn.Conv2d(3, num_filters, 3, stride=2)])
-
+        self.cov_net = nn.ModuleList([nn.Conv2d(3, self.num_filters, 3, stride=2)])
         for i in range(self.num_layers - 1):
-            self.cov_net.append(nn.Conv2d(num_filters, num_filters, 3, stride=1))
-        '''
-        self.cov_net = nn.ModuleList([nn.Conv2d(3,  32, 3, stride=2),
-                                      nn.Conv2d(32, 32, 3, stride=1),
-                                      nn.Conv2d(32, 32, 3, stride=1),
-                                      nn.Conv2d(32, 32, 3, stride=1),
-                                      ])
-        '''
-        self.fc  = nn.Linear(39200, latent_dim)
-        self.ln  = nn.LayerNorm(latent_dim)
+            self.cov_net.append(nn.Conv2d(self.num_filters, self.num_filters, 3, stride=1))
+
+        self.fc  = nn.Linear(39200, self.latent_dim)
+        self.ln  = nn.LayerNorm(self.latent_dim)
 
     def forward_conv(self, x):
-        '''
-        x = torch.relu(self.cov_net[0](x))
-        x = torch.relu(self.cov_net[1](x))
-        x = torch.relu(self.cov_net[2](x))
-        x = torch.relu(self.cov_net[3](x))
-        x = torch.flatten(x, start_dim=1)
-        return x
-        '''
         conv = torch.relu(self.cov_net[0](x))
         for i in range(1, self.num_layers):
             conv = torch.relu(self.cov_net[i](conv))
@@ -203,14 +197,6 @@ class Encoder(nn.Module):
         return h
 
     def forward(self, obs, detach=False):
-        '''
-        x = self.forward_conv(x)
-        if detach_encoder:
-            x = x.detach()
-        x = self.fc(x)
-        x = self.ln(x)
-        x = torch.tanh(x)
-        '''
         h = self.forward_conv(obs)
         if detach:
             h = h.detach()
@@ -221,15 +207,12 @@ class Encoder(nn.Module):
 
     def copy_conv_weights_from(self, model_source):
         for i in range(self.num_layers):
-            #self.cov_net[i].weight = model_source.cov_net[i].weight
-            #self.cov_net[i].bias   = model_source.cov_net[i].bias
             tie_weights(src=model_source.cov_net[i], trg=self.cov_net[i])
-
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 class Actor(nn.Module):
     def __init__(self, latent_dim, action_dim):
         super(Actor, self).__init__()
-
         self.encoder_net = Encoder(latent_dim)
         self.act_net = nn.Sequential(
             nn.Linear(latent_dim, 1024),
@@ -250,7 +233,6 @@ class Actor(nn.Module):
 class QFunction(nn.Module):
     def __init__(self, obs_dim, action_dim, hidden_dim):
         super().__init__()
-
         self.trunk = nn.Sequential(
             nn.Linear(obs_dim + action_dim, hidden_dim),
             nn.ReLU(),
@@ -263,13 +245,13 @@ class QFunction(nn.Module):
         obs_action = torch.cat([obs, action], dim=1)
         return self.trunk(obs_action)
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 class Critic(nn.Module):
     def __init__(self, latent_dim, action_dim):
         super(Critic, self).__init__()
 
-        self.encoder_net  = Encoder(latent_dim)
-        input_critic_size = latent_dim + action_dim
-
+        self.encoder_net = Encoder(latent_dim)
+        self.hidden_dim  = 1024
         '''
         self.Q1 = nn.Sequential(
             nn.Linear(input_critic_size, 1024),
@@ -286,17 +268,16 @@ class Critic(nn.Module):
             nn.Linear(1024, 1),
         )
         '''
-        self.Q1 = QFunction(latent_dim, 1, 1024)
-        self.Q2 = QFunction(latent_dim, 1, 1024)
+        self.Q1 = QFunction(latent_dim, action_dim, self.hidden_dim)
+        self.Q2 = QFunction(latent_dim, action_dim, self.hidden_dim)
 
         self.apply(weight_init)
 
     def forward(self, state, action, detach_encoder=False):
         z_vector = self.encoder_net(state, detach=detach_encoder)
-        q1 = self.Q1(z_vector, action)
-        q2 = self.Q2(z_vector, action)
+        q1       = self.Q1(z_vector, action)
+        q2       = self.Q2(z_vector, action)
         return q1, q2
-
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class RLAgent:
@@ -316,32 +297,37 @@ class RLAgent:
         self.update_counter     = 0
         self.policy_freq_update = 2
 
-        self.batch_size = 32  # 128
+        self.batch_size = 32   # 32
         self.latent_dim = 50   # 50
         self.action_dim = 1
 
         self.memory = Memory()
 
+        # main networks
         self.actor  = Actor(self.latent_dim, self.action_dim).to(device)
         self.critic = Critic(self.latent_dim, self.action_dim).to(device)
-
+        # target networks
         self.actor_target  = Actor(self.latent_dim, self.action_dim).to(device)
         self.critic_target = Critic(self.latent_dim, self.action_dim).to(device)
 
         # tie encoders between actor and critic
+        # with this, any changes in the critic encoder
+        # will also be affecting the actor-encoder during the whole training
         self.actor.encoder_net.copy_conv_weights_from(self.critic.encoder_net)
 
+        # copy weights and bias from main to target networks
         self.critic_target.load_state_dict(self.critic.state_dict())
         self.actor_target.load_state_dict(self.actor.state_dict())
 
+        # main Decoder
         self.decoder = Decoder(self.latent_dim).to(device)
         self.decoder.apply(weight_init)
 
+        # Optimizer
         self.encoder_optimizer = torch.optim.Adam(self.critic.encoder_net.parameters(), lr=self.encoder_lr)
-        self.decoder_optimizer = torch.optim.Adam(self.decoder.parameters(), lr=self.decoder_lr, weight_decay=1e-7)
-
-        self.actor_optimizer   = torch.optim.Adam(self.actor.parameters(), lr=self.actor_lr, betas=(0.9, 0.999))
-        self.critic_optimizer  = torch.optim.Adam(self.critic.parameters(),  lr=self.critic_lr, betas=(0.9, 0.999))
+        self.decoder_optimizer = torch.optim.Adam(self.decoder.parameters(),            lr=self.decoder_lr, weight_decay=1e-7)
+        self.actor_optimizer   = torch.optim.Adam(self.actor.parameters(),              lr=self.actor_lr, betas=(0.9, 0.999))
+        self.critic_optimizer  = torch.optim.Adam(self.critic.parameters(),             lr=self.critic_lr, betas=(0.9, 0.999))
 
         self.actor.train(True)
         self.critic.train(True)
@@ -349,12 +335,10 @@ class RLAgent:
         self.actor_target.train(True)
         self.decoder.train(True)
 
-
     def select_action_from_policy(self, state_image_pixel):
         with torch.no_grad():
             state_image_tensor  = torch.FloatTensor(state_image_pixel)
             state_image_tensor  = state_image_tensor.unsqueeze(0).to(device)
-            #state_image_tensor  = state_image_tensor.permute(0, 3, 1, 2).to(device)
             action = self.actor.forward(state_image_tensor)
             action = action.cpu().data.numpy()
         return action[0]
@@ -390,7 +374,6 @@ class RLAgent:
                 critic_loss_total.backward()
                 self.critic_optimizer.step()
 
-
                 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 # Update the actor and soft updates of targets networks
                 if self.update_counter % self.policy_freq_update == 0:
@@ -403,7 +386,6 @@ class RLAgent:
                     self.actor_optimizer.zero_grad()
                     actor_loss.backward()
                     self.actor_optimizer.step()
-
 
                     # ------------------------------------- Update target networks --------------- #
                     for param, target_param in zip(self.critic.Q1.parameters(), self.critic_target.Q1.parameters()):
@@ -418,14 +400,12 @@ class RLAgent:
                     for param, target_param in zip(self.actor.encoder_net.parameters(), self.actor_target.encoder_net.parameters()):
                         target_param.data.copy_(self.tau_encoder * param.data + (1 - self.tau_encoder) * target_param.data)
 
-
                 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 # Update the autoencoder part
                 z_vector = self.critic.encoder_net(state_batch)
                 rec_obs  = self.decoder(z_vector)
 
-                rec_loss = F.mse_loss(state_batch, rec_obs)
-
+                rec_loss    = F.mse_loss(state_batch, rec_obs)
                 latent_loss = (0.5 * z_vector.pow(2).sum(1)).mean()  # add L2 penalty on latent representation
 
                 ae_loss = rec_loss + 1e-6 * latent_loss
@@ -436,15 +416,38 @@ class RLAgent:
                 self.encoder_optimizer.step()
                 self.decoder_optimizer.step()
 
+    def save_models(self):
+        torch.save(self.actor.state_dict(), f'trained_models/AE-TD3_actor_pendulum.pht')
+        torch.save(self.critic.encoder_net.state_dict(), f'trained_models/AE-TD3_encoder_pendulum.pht')
+        torch.save(self.decoder.state_dict(), f'trained_models/AE-TD3_decoder_pendulum.pht')
+        print("models have been saved...")
 
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 def plot_reward(reward_vector):
     plt.title("Rewards")
     plt.plot(reward_vector)
-    plt.show()
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    plt.savefig(f"plot_results/AE-TD3_pendulum_reward_curve.png")
+    np.savetxt(f"plot_results/AE-TD3_pendulum_reward_curve.txt", reward_vector)
+    #plt.show()
 
-def run_random_exploration(env, agent, frames_stack, num_exploration_episodes=100, episode_horizont=200):
+def plot_reconstructions(input_img, reconstruction_img):
+    input_img          = np.transpose(input_img, (1, 2, 0))
+    reconstruction_img = np.transpose(reconstruction_img, (1, 2, 0))
+
+    plt.subplot(1, 2, 1)
+    plt.title("Image")
+    plt.imshow(input_img)
+
+    plt.subplot(1, 2, 2)
+    plt.title("Reconstruction")
+    plt.imshow(reconstruction_img)
+
+    plt.savefig(f"plot_results/AE-TD3_pendulum_image_reconstruction.png")
+    #plt.show()
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+def run_random_exploration(env, agent, frames_stack, num_exploration_episodes=200, episode_horizont=200):
     print("exploration start")
     for episode in tqdm(range(1, num_exploration_episodes + 1)):
         state_image = frames_stack.reset()
@@ -458,7 +461,7 @@ def run_random_exploration(env, agent, frames_stack, num_exploration_episodes=10
     print("exploration end")
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-def run_training_rl_method(env, agent, frames_stack, num_episodes_training=400, episode_horizont=200):
+def run_training_rl_method(env, agent, frames_stack, num_episodes_training=500, episode_horizont=200):
     total_reward = []
     for episode in range(1, num_episodes_training + 1):
         state_image = frames_stack.reset()
@@ -477,21 +480,20 @@ def run_training_rl_method(env, agent, frames_stack, num_episodes_training=400, 
             agent.update_function()
         total_reward.append(episode_reward)
         print(f"Episode {episode} End, Total reward: {episode_reward}")
+    agent.save_models()
     plot_reward(total_reward)
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-def evaluation(env, agent, frames_stack):
-    state_image = frames_stack.reset()
+def autoencoder_evaluation(agent, frames_stack):
+    state_image        = frames_stack.reset()
     state_image_tensor = torch.FloatTensor(state_image)
     state_image_tensor = state_image_tensor.unsqueeze(0).to(device)
 
     with torch.no_grad():
         z_vector = agent.critic.encoder_net(state_image_tensor)
-        rec_obs = agent.decoder(z_vector)
+        rec_obs  = agent.decoder(z_vector)
+        rec_obs = rec_obs.cpu().numpy()
 
-    rec_obs = rec_obs.cpu().numpy()
-    plt.imshow(rec_obs[0][1])
-    plt.show()
-
+    plot_reconstructions(state_image, rec_obs[0])
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 def main():
@@ -501,7 +503,7 @@ def main():
 
     run_random_exploration(env, agent, frames_stack)
     run_training_rl_method(env, agent, frames_stack)
-    evaluation(env, agent, frames_stack)
+    autoencoder_evaluation(agent, frames_stack)
     env.close()
 
 

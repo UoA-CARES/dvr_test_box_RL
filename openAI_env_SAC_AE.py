@@ -1,12 +1,32 @@
+"""
+SAC with deterministic AE for pendulum env only
+This is a re-implementation of the paper  https://arxiv.org/pdf/1910.01741.pdf
+however I removed or changed some parts
+Reference code: https://github.com/denisyarats/pytorch_sac_ae
+
+
+Every state is rendered and passed as input to the autoencoder, after preprocessing it
+
+original image 510 x510 x 3
+Input for the encoder = 3 stacked frames, gray scalded, normalized and resized (84 , 83)
+The input is batch-size x 3 x 84 x 84, where the stacked number takes the place of the channel for covnet
+
+status = working
+keys= initial exploration is very important
+"""
+
 import gym
 import cv2
+import random
+import numpy as np
+from tqdm import tqdm
+
+from collections import deque
+import matplotlib.pyplot as plt
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
-import numpy as np
-from collections import deque
-import random
 
 
 class Memory:
@@ -156,7 +176,8 @@ class Decoder(nn.Module):
             self.outputs['deconv%s' % (i + 1)] = x
 
         obs = self.deconvs[-1](x)
-        obs = torch.sigmoid(obs)  # original paper no use activation function here. I added it
+        obs = torch.sigmoid(obs)  # original paper no use activation function here. I added it with it helps to get faster results
+                                   # and this is very important to reduce the learning time, THIS IS CRITICAL in my implemetation
         self.outputs['obs'] = obs
         return obs
 
@@ -440,6 +461,11 @@ class RLAgent:
                 self.encoder_optimizer.step()
                 self.decoder_optimizer.step()
 
+    def save_models(self):
+        torch.save(self.actor.state_dict(), f'trained_models/AE-SAC_actor_pendulum.pht')
+        print("models have been saved...")
+
+
 
 def pre_pro_image(image_array, bits=5):
     resized     = cv2.resize(image_array, (84, 84), interpolation=cv2.INTER_AREA)
@@ -453,10 +479,11 @@ def pre_pro_image(image_array, bits=5):
 def plot_reward(reward_vector):
     plt.title("Rewards")
     plt.plot(reward_vector)
-    plt.show()
+    plt.savefig(f"plot_results/AE-SAC_pendulum_reward_curve.png")
+    np.savetxt(f"plot_results/AE-SAC_pendulum_reward_curve.txt", reward_vector)
 
 
-def run_training_rl_method(env, agent, frames_stack, num_episodes_training=400, episode_horizont=200):
+def run_training_rl_method(env, agent, frames_stack, num_episodes_training=500, episode_horizont=200):
     total_reward = []
     for episode in range(1, num_episodes_training + 1):
         #env.reset()
@@ -482,11 +509,12 @@ def run_training_rl_method(env, agent, frames_stack, num_episodes_training=400, 
         total_reward.append(episode_reward)
         print(f"Episode {episode} End, Total reward: {episode_reward}")
     plot_reward(total_reward)
+    agent.save_models()
 
 
-def run_random_exploration(env, agent, frames_stack,  num_exploration_episodes=100, episode_horizont=200):
+def run_random_exploration(env, agent, frames_stack,  num_exploration_episodes=200, episode_horizont=200):
     print("exploration start")
-    for episode in range(1, num_exploration_episodes + 1):
+    for episode in tqdm(range(1, num_exploration_episodes + 1)):
         #env.reset()
         #state_image = env.render(mode='rgb_array')  # return the rendered image and can be used as input-state image
         #state_image = pre_pro_image(state_image)

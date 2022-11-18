@@ -1,15 +1,23 @@
+"""
+Author: DVR
+Date:
+Modification: 17/11/2022
 
-
+Description: Environment for robot gripper, autoencoder
+             Task = Rotation valve only
+             Input = Images only
+"""
 import cv2
+import math
+import time
+import random
+import numpy as np
+
 from gripper_motor_utilities import Motor
 from gripper_vision_utilities import VisionCamera
 
-import numpy as np
-import random
-import time
 
-import math
-class RL_ENV:
+class ENV:
 
     def __init__(self, camera_index=0, device_index=0):
 
@@ -23,7 +31,8 @@ class RL_ENV:
         self.goal_angle_deg   = 0.0
         self.counter_success  = 0
 
-    def generate_sample_act(self):
+
+    def generate_sample_action(self):
         act_m1 = np.clip(random.uniform(-1, 1), -1, 1)
         act_m2 = np.clip(random.uniform(-1, 1), -1, 1)
         act_m3 = np.clip(random.uniform(-1, 1), -1, 1)
@@ -31,19 +40,19 @@ class RL_ENV:
         action_vector = np.array([act_m1, act_m2, act_m3, act_m4])
         return action_vector
 
-    def env_reset(self):
+    def reset(self):
         id_1_dxl_home_position = 310
         id_2_dxl_home_position = 310
         id_3_dxl_home_position = 690
         id_4_dxl_home_position = 690
-        print("Sending Robot to Home Position")
         self.motors_config.move_motor_step(id_1_dxl_home_position, id_2_dxl_home_position,
                                            id_3_dxl_home_position, id_4_dxl_home_position)
 
+        print("Sending Robot to Home Position")
+
         time.sleep(1.0)  # just to make sure robot is moving to home position
 
-
-    def env_step(self, actions):
+    def step_action(self, actions):
         id_1_dxl_goal_position = (actions[0] - (-1)) * (700 - 300) / (1 - (-1)) + 300
         id_2_dxl_goal_position = (actions[1] - (-1)) * (700 - 300) / (1 - (-1)) + 300
         id_3_dxl_goal_position = (actions[2] - (-1)) * (700 - 300) / (1 - (-1)) + 300
@@ -71,7 +80,7 @@ class RL_ENV:
 
     def define_goal_angle(self):
         # self.goal_angle_deg = random.randint(0, 360)
-        self.goal_angle_deg = random.randint(-180, 180)  # because the valve dtection return this
+        self.goal_angle_deg = random.randint(-180, 180)
         print("New Goal Angle Generated", self.goal_angle_deg)
         return self.goal_angle_deg
 
@@ -90,7 +99,6 @@ class RL_ENV:
 
 
     def render(self, image, step, episode, valve_angle, target_angle, done):
-
         if done:
             self.counter_success += 1
             color = (0, 255, 0)

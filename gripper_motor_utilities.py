@@ -4,15 +4,12 @@ from dynamixel_sdk import *
 if os.name == 'nt':
     import msvcrt
 
-
     def getch():
         return msvcrt.getch().decode()
 else:
     import sys, tty, termios
-
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
-
 
     def getch():
         try:
@@ -21,11 +18,10 @@ else:
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         return ch
-
-
+#======================================================================================================================
+#======================================================================================================================
 class Motor:
     def __init__(self, device_index=0):
-
         if device_index == 0:
             DEVICENAME = '/dev/ttyUSB0'  # USB used
         else:
@@ -33,14 +29,14 @@ class Motor:
 
         #  ------------------Initial Parameters---------------------------
         # Address of each parameter. See the eManual for details about these values
-        self.ADDR_TORQUE_ENABLE  = 24
-        self.ADDR_GOAL_POSITION  = 30
-        self.ADDR_MOVING_SPEED   = 32
-        self.ADDR_TORQUE_LIMIT   = 35
-        self.ADDR_LED_ENABLE     = 25
+        self.ADDR_TORQUE_ENABLE    = 24
+        self.ADDR_GOAL_POSITION    = 30
+        self.ADDR_MOVING_SPEED     = 32
+        self.ADDR_TORQUE_LIMIT     = 35
+        self.ADDR_LED_ENABLE       = 25
         self.ADDR_PRESENT_POSITION = 37
 
-        self.BAUDRATE = 1000000  # Default Baudrate of XL-320 is 1Mbps
+        self.BAUDRATE         = 1000000  # Default Baud-rate of XL-320 is 1Mbps
         self.PROTOCOL_VERSION = 2.0  # Default for XL-320
 
         # ID for each motor
@@ -51,14 +47,13 @@ class Motor:
         self.motor_list = [1, 2, 3, 4]
 
         # Configuration values
-        self.TORQUE_ENABLE = 1  # Value for enabling the torque
+        self.TORQUE_ENABLE  = 1  # Value for enabling the torque
         self.TORQUE_DISABLE = 0  # Value for disabling the torque
         self.DXL_MAX_VELOCITY_VALUE = 100  # Value for limited the speed. Max possible value=2047 meaning max speed
         self.DXL_MAX_TORQUE_VALUE   = 100  # It is the torque value of maximum output. 0 to 1,023 can be used
 
-
-        self.portHandler = PortHandler(DEVICENAME)
         # Initialize PacketHandler instance
+        self.portHandler   = PortHandler(DEVICENAME)
         self.packetHandler = PacketHandler(self.PROTOCOL_VERSION)
 
         # open the port
@@ -74,7 +69,7 @@ class Motor:
         # Need this in order to move all the motor at the same time
         # Initialize GroupSyncWrite instance ---> GroupSyncWrite(port, ph, start_address, data_length)
 
-        data_length = 2  # data len of goal position and present position
+        data_length         = 2  # data len of goal position and present position
         self.groupSyncWrite = GroupSyncWrite(self.portHandler, self.packetHandler, self.ADDR_GOAL_POSITION, data_length)
 
     def open_usb_port(self):
@@ -258,7 +253,7 @@ class Motor:
                 break
 
             end_time = time.time()
-            timer = end_time - start_time
+            timer    = end_time - start_time
 
             if timer >= 1.0:
                 #print("time over, couldn't reach to the point. Moving to next action")
