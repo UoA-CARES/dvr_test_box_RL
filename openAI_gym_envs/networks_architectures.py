@@ -512,7 +512,6 @@ class PolicyNetworkSACDeterministic(nn.Module):
     def __init__(self, vector_size, num_actions):
         super(PolicyNetworkSACDeterministic, self).__init__()
 
-
         self.num_actions = num_actions
         self.input_size  = vector_size
         self.hidden_size = [128, 64, 32]

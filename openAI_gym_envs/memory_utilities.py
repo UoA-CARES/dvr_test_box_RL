@@ -1,11 +1,14 @@
 
-from collections import deque
+import torch
 import random
+from collections import deque
 
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 class MemoryClass:
-
     def __init__(self, replay_max_size):
+        print("Memory size", replay_max_size)
 
         self.replay_max_size           = replay_max_size
         self.memory_buffer_experiences = deque(maxlen=replay_max_size)
