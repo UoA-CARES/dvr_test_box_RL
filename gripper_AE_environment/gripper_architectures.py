@@ -21,8 +21,9 @@ def weight_init(m):
         mid = m.weight.size(2) // 2
         gain = nn.init.calculate_gain('relu')
         nn.init.orthogonal_(m.weight.data[:, :, mid, mid], gain)
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#                                  Encoder
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Encoder(nn.Module):
     def __init__(self, latent_dim):
@@ -58,81 +59,9 @@ class Encoder(nn.Module):
         # to tie critic encoder cov net with actor encoder cov net
         for i in range(self.num_layers):
             tie_weights(src=model_source.cov_net[i], trg=self.cov_net[i])
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-class QFunction(nn.Module):
-    def __init__(self, obs_dim, action_dim, hidden_dim):
-        super().__init__()
-
-        self.trunk = nn.Sequential(
-            nn.Linear(obs_dim + action_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, 1)
-        )
-
-    def forward(self, obs, action):
-        obs_action = torch.cat([obs, action], dim=1)
-        return self.trunk(obs_action)
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-class Critic(nn.Module):
-    def __init__(self, latent_dim, input_dim, action_dim):
-        super(Critic, self).__init__()
-
-        self.encoder_net = Encoder(latent_dim)
-        self.hidden_dim  = 1024
-
-        self.Q1 = QFunction(input_dim, action_dim, self.hidden_dim)
-        self.Q2 = QFunction(input_dim, action_dim, self.hidden_dim)
-
-        self.apply(weight_init)
-
-    def forward(self, state, action, goal_angle, target_on=True, detach_encoder=False):
-        if target_on:
-            z_vector = self.encoder_net(state, detach=detach_encoder)
-            z_vector = torch.cat([z_vector, goal_angle], dim=1)
-            q1 = self.Q1(z_vector, action)
-            q2 = self.Q2(z_vector, action)
-        else:
-            z_vector = self.encoder_net(state, detach=detach_encoder)
-            q1       = self.Q1(z_vector, action)
-            q2       = self.Q2(z_vector, action)
-
-        return q1, q2
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-class Actor(nn.Module):
-    def __init__(self, latent_dim, input_dim, action_dim):
-        super(Actor, self).__init__()
-        self.encoder_net = Encoder(latent_dim)
-
-        self.act_net = nn.Sequential(
-            nn.Linear(input_dim, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, 1024),
-            nn.ReLU(),
-            nn.Linear(1024, action_dim),
-        )
-        self.apply(weight_init)
-
-    def forward(self, state, goal_angle, target_on=True, detach_encoder=False):
-        if target_on:
-            z_vector = self.encoder_net(state, detach=detach_encoder)
-            z_vector = torch.cat([z_vector, goal_angle], dim=1)
-            output = self.act_net(z_vector)
-            output = torch.tanh(output)
-        else:
-            z_vector = self.encoder_net(state, detach=detach_encoder)
-            output   = self.act_net(z_vector)
-            output   = torch.tanh(output)
-        return output
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+#                                       Decoder
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Decoder(nn.Module):
     def __init__(self, latent_dim):
@@ -161,3 +90,85 @@ class Decoder(nn.Module):
         x = x.view(-1, 128, 35, 35)
         x = self.deconvs(x)
         return x
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#                                       Critic
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+class QFunction(nn.Module):
+    def __init__(self, obs_dim, action_dim, hidden_dim):
+        super().__init__()
+
+        self.trunk = nn.Sequential(
+            nn.Linear(obs_dim + action_dim, hidden_dim[0]),
+            nn.ReLU(),
+            nn.Linear(hidden_dim[0], hidden_dim[1]),
+            nn.ReLU(),
+            nn.Linear(hidden_dim[1], hidden_dim[2]),
+            nn.ReLU(),
+            nn.Linear(hidden_dim[2], 1)
+        )
+
+    def forward(self, obs, action):
+        obs_action = torch.cat([obs, action], dim=1)
+        return self.trunk(obs_action)
+
+#-----------------------------------------------------------------------------------------------------
+class Critic(nn.Module):
+    def __init__(self, latent_dim, input_dim, action_dim):
+        super(Critic, self).__init__()
+
+        self.encoder_net = Encoder(latent_dim)
+        self.hidden_dim  = [1024, 1024, 1024]
+
+        self.Q1 = QFunction(input_dim, action_dim, self.hidden_dim)
+        self.Q2 = QFunction(input_dim, action_dim, self.hidden_dim)
+
+        self.apply(weight_init)
+
+    def forward(self, state, action, goal_angle, target_on=True, detach_encoder=False):
+        if target_on:
+            z_vector = self.encoder_net(state, detach=detach_encoder)
+            z_vector = torch.cat([z_vector, goal_angle], dim=1)
+            q1 = self.Q1(z_vector, action)
+            q2 = self.Q2(z_vector, action)
+        else:
+            z_vector = self.encoder_net(state, detach=detach_encoder)
+            q1       = self.Q1(z_vector, action)
+            q2       = self.Q2(z_vector, action)
+        return q1, q2
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#                                       Actor
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+class Actor(nn.Module):
+    def __init__(self, latent_dim, input_dim, action_dim):
+        super(Actor, self).__init__()
+        self.encoder_net = Encoder(latent_dim)
+        self.hidden_size = [1024, 1024, 1024]
+
+        self.act_net = nn.Sequential(
+            nn.Linear(input_dim, self.hidden_size[0]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[0], self.hidden_size[1]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[1], self.hidden_size[2]),
+            #nn.BatchNorm1d(self.hidden_size[2]), # this is from my previous, if use this i need eval mode when choose actions
+            nn.LayerNorm(self.hidden_size[2]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[2], action_dim),
+        )
+        self.apply(weight_init)
+
+    def forward(self, state, goal_angle, target_on=True, detach_encoder=False):
+        if target_on:
+            z_vector = self.encoder_net(state, detach=detach_encoder)
+            z_vector = torch.cat([z_vector, goal_angle], dim=1)
+            output = self.act_net(z_vector)
+            output = torch.tanh(output)
+        else:
+            z_vector = self.encoder_net(state, detach=detach_encoder)
+            output   = self.act_net(z_vector)
+            output   = torch.tanh(output)
+        return output
+
+

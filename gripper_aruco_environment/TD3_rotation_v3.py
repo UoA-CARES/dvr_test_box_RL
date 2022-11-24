@@ -61,16 +61,17 @@ class TD3agent_rotation:
         self.critic_target.load_state_dict(self.critic.state_dict())
         self.actor_target.load_state_dict(self.actor.state_dict())
 
-
         self.actor_optimizer  = optim.Adam(self.actor.parameters(),  lr=self.actor_learning_rate)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=self.critic_learning_rate)
 
 
     def get_action_from_policy(self, state):
+        self.actor.eval() # i need this because i am using batch normalization on actor network
         with torch.no_grad():
             state_tensor = torch.from_numpy(state).float().unsqueeze(0).to(self.device)  # numpy to a tensor with shape [1,16]
-            action = self.actor(state_tensor)
-            action = action.cpu().data.numpy().flatten()
+            action       = self.actor(state_tensor)
+            action       = action.cpu().data.numpy().flatten()
+        self.actor.train()
         return action
 
 
@@ -165,11 +166,9 @@ def run_exploration(env, episodes, horizont, agent):
 def run_training(env, num_episodes_training, episode_horizont, agent):
     mode    = "Training TD3"
     rewards = []
-
     for episode in range(1, num_episodes_training + 1):
         env.reset_env()
         episode_reward = 0
-
         for step in range(1, episode_horizont + 1):
             state, _ = env.state_space_function()
             action   = agent.get_action_from_policy(state)
@@ -182,6 +181,7 @@ def run_training(env, num_episodes_training, episode_horizont, agent):
             next_state, image_state = env.state_space_function()
             reward, done    = env.calculate_reward()
             episode_reward += reward
+
             agent.memory.replay_buffer_add(state, action, reward, next_state, done)
             env.env_render(image=image_state, episode=episode, step=step, done=done, mode=mode, cylinder=next_state[-2:-1])
             if done:
@@ -201,14 +201,14 @@ def run_training(env, num_episodes_training, episode_horizont, agent):
 
 def define_parse_args():
     parser = ArgumentParser()
-    parser.add_argument('--camera_index', type=int, default=0)
-    parser.add_argument('--usb_index',    type=int, default=1)
-    parser.add_argument('--robot_index',  type=str, default='robot-2')
+    parser.add_argument('--camera_index',     type=int, default=0)
+    parser.add_argument('--usb_index',        type=int, default=1)
+    parser.add_argument('--robot_index',      type=str, default='robot-2')
     parser.add_argument('--replay_max_size',  type=int, default=20_000)
 
     parser.add_argument('--batch_size',               type=int, default=64)
-    parser.add_argument('--num_exploration_episodes', type=int, default=1000)
-    parser.add_argument('--num_training_episodes',    type=int, default=4000)
+    parser.add_argument('--num_exploration_episodes', type=int, default=1_000)
+    parser.add_argument('--num_training_episodes',    type=int, default=4_000)
     parser.add_argument('--episode_horizont',         type=int, default=20)
 
     args   = parser.parse_args()

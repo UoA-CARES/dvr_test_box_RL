@@ -41,6 +41,8 @@ class Actor(nn.Module):
             nn.Linear(hidden_size[0], hidden_size[1]),
             nn.ReLU(),
             nn.Linear(hidden_size[1], hidden_size[2]),
+            nn.BatchNorm1d(hidden_size[2]), # this is from my previous version, could be critical
+            #nn.LayerNorm(hidden_size[2]), # this new on this version
             nn.ReLU(),
             nn.Linear(hidden_size[2], action_dim)
         )

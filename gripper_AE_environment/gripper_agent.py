@@ -1,78 +1,21 @@
 
-"""
-Author: David Valencia
-Date: 17/11/2022
-Modification:
-Description:
-            AE-Using test bed camera
-            input image size = 1024 * 960
-            input NN size    = 84 * 84
-            latent vector    = 50
-"""
-
-
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
-
 import numpy as np
-
-from tqdm import tqdm
 import matplotlib.pyplot as plt
-from argparse import ArgumentParser
-
-from gripper_environment import ENV
 from gripper_architectures import Actor, Critic, Decoder
-from gripper_function_utilities import FrameStack
-from gripper_memory_utilities import MemoryClass
-
-
-
-'''
-    def plot_functions(self, rewards, final_distance, check_point):
-
-        np.savetxt(f"plot_results/{self.robot_index}_rewards.txt", rewards)
-        np.savetxt(f"plot_results/{self.robot_index}_final_distance.txt", final_distance)
-
-        avg_plot_window = 100
-        plt.figure(figsize=(20, 10))
-
-        plt.subplot(2, 2, 1)  # row 1, col 2 index 1
-        plt.title("Reward Function Curve")
-        rewards_smoothed = pd.Series(rewards).rolling(avg_plot_window, min_periods=avg_plot_window).mean()
-        plt.plot(rewards)
-        plt.plot(rewards_smoothed)
-
-        plt.subplot(2, 2, 2)  # index 2
-        plt.title("Final Distance to Goal")
-        distance_smoothed = pd.Series(final_distance).rolling(avg_plot_window, min_periods=avg_plot_window).mean()
-        plt.plot(final_distance)
-        plt.plot(distance_smoothed)
-
-        plt.subplot(2, 2, 3)  # index 3
-        plt.title("Prediction Loss Curve")
-        plt.plot(self.forward_prediction_loss)
-
-        plt.subplot(2, 2, 4)  # index 4
-        plt.title("VAE Loss Curve")
-        plt.plot(self.vae_loss)
-
-        if check_point:
-            #plt.subplots(figsize=(20, 10))
-            plt.savefig(f"plot_results/{self.robot_index}_check_point_curve.png")
-        else:
-            plt.savefig(f"plot_results/{self.robot_index}_final_curve.png")
-            #plt.show()
-'''
 
 
 class Td3Agent:
-    def __init__(self, env, robot_index, device, memory_buffer, include_goal_angle_on):
+    def __init__(self, env, robot_index, device, memory_buffer, include_goal_angle_on, batch_size):
+
+        # ---------------- parameters  -------------------------#
         self.env         = env
         self.robot_index = robot_index
         self.device      = device
         self.memory      = memory_buffer
+        self.action_dim  = 4
 
         # ---------------- Hyperparameters  -------------------------#
         self.encoder_lr = 1e-3
@@ -84,21 +27,19 @@ class Td3Agent:
         self.tau         = 0.005
         self.tau_encoder = 0.001
 
-        self.G                  = 3  # 1
+        self.G                  = 10
         self.update_counter     = 0
         self.policy_freq_update = 2
+        self.batch_size         = batch_size
 
-        self.batch_size = 64  # 32
-        self.action_dim = 4
-
-        self.include_goal_angle_on = include_goal_angle_on
-
+        # ---------------- Extras  -------------------------#
         self.ae_loss_record = []
+        self.include_goal_angle_on = include_goal_angle_on
 
         # by include_goal_angle_on True, the  target angle is concatenated with the latent vector
         if self.include_goal_angle_on:
             self.latent_dim = 50
-            self.input_dim  = 51  # 50 for latent size and 1 for target value
+            self.input_dim  = 51  # 50 for latent size + 1 for target value
         else:
             self.latent_dim = 50
             self.input_dim  = 50
@@ -109,7 +50,7 @@ class Td3Agent:
         self.critic = Critic(self.latent_dim, self.input_dim, self.action_dim).to(self.device)
 
         # target networks
-        self.actor_target = Actor(self.latent_dim, self.input_dim, self.action_dim).to(self.device)
+        self.actor_target  = Actor(self.latent_dim, self.input_dim, self.action_dim).to(self.device)
         self.critic_target = Critic(self.latent_dim, self.input_dim, self.action_dim).to(self.device)
 
         # tie encoders between actor and critic, any changes in the critic encoder will also be affecting the actor-encoder
@@ -214,6 +155,7 @@ class Td3Agent:
                 self.encoder_optimizer.step()
                 self.decoder_optimizer.step()
 
+
     def save_models(self):
         torch.save(self.actor.state_dict(), f'trained_models/AE-TD3_actor_gripper.pht')
         torch.save(self.critic.encoder_net.state_dict(), f'trained_models/AE-TD3_encoder_gripper.pht')
@@ -242,105 +184,3 @@ class Td3Agent:
             np.savetxt(f"plot_results/AE-TD3_gripper_reward_curve_include_goal_{self.include_goal_angle_on}.txt", rewards)
             np.savetxt(f"plot_results/AE-TD3_gripper_distance_curve_include_goal_{self.include_goal_angle_on}.txt", distance)
             np.savetxt(f"plot_results/AE-TD3_gripper_ae_loss_curve_include_goal_{self.include_goal_angle_on}.txt", self.ae_loss_record)
-
-
-def define_parse_args():
-    parser = ArgumentParser()
-    parser.add_argument('--k', type=int, default=3)
-    parser.add_argument('--include_goal_angle_on', type=bool, default=True)
-    parser.add_argument('--camera_index', type=int, default=2)
-    parser.add_argument('--usb_index',    type=int, default=0)
-    parser.add_argument('--robot_index',  type=str, default='robot-1')
-    parser.add_argument('--replay_max_size',  type=int, default=20_000)
-
-    parser.add_argument('--num_exploration_episodes', type=int, default=1000)
-    parser.add_argument('--num_training_episodes',    type=int, default=4000)
-    parser.add_argument('--episode_horizont',         type=int, default=20)
-
-    args   = parser.parse_args()
-    return args
-
-def main_run():
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    args   = define_parse_args()
-    # todo define a seed value here https://github.com/denisyarats/pytorch_sac_ae/blob/master/train.py#:~:text=utils.set_seed_everywhere(args.seed)
-
-    env = ENV(
-        camera_index=args.camera_index,
-        device_index=args.usb_index,
-    )
-
-    memory_buffer = MemoryClass(
-        replay_max_size=args.replay_max_size,
-        device=device,
-    )
-
-    agent = Td3Agent(
-        env=env,
-        robot_index=args.robot_index,
-        device=device,
-        memory_buffer=memory_buffer,
-        include_goal_angle_on=args.include_goal_angle_on,
-    )
-
-    frame_stack = FrameStack(
-        k=args.k,
-        env=env
-    )
-
-    initial_exploration(env, frame_stack, memory_buffer, args.num_exploration_episodes, args.episode_horizont)
-    train_function(env, agent, frame_stack, memory_buffer, args.num_training_episodes, args.episode_horizont)
-
-def initial_exploration(env, frames_stack, memory, num_exploration_episodes, episode_horizont):
-    print("exploration start")
-    for episode in tqdm(range(1, num_exploration_episodes + 1)):
-        state_images  = frames_stack.reset()
-        goal_angle    = env.define_goal_angle()
-        for step in range(1, episode_horizont + 1):
-            action = env.generate_sample_action()
-            new_state_images, reward, done, distance, original_img, valve_angle = frames_stack.step(action, goal_angle)
-            memory.save_experience_to_buffer(state_images, action, reward, new_state_images, done, goal_angle)
-            state_images = new_state_images
-            env.render(original_img, step, episode, valve_angle, goal_angle, done)
-            if done:
-                break
-    print("exploration end")
-
-def train_function(env, agent, frames_stack, memory, num_training_episodes, episode_horizont):
-    total_reward = []
-    episode_distance_to_goal = []
-    for episode in range(1, num_training_episodes + 1):
-        state_images   = frames_stack.reset()
-        goal_angle     = env.define_goal_angle()
-        episode_reward   = 0
-        distance_to_goal = 0
-        for step in range(1, episode_horizont + 1):
-            action = agent.select_action_from_policy(state_images, goal_angle)
-            noise  = np.random.normal(0, scale=0.15, size=4)
-            action = action + noise
-            action = np.clip(action, -1, 1)
-            new_state_images, reward, done, distance, original_img, valve_angle = frames_stack.step(action, goal_angle)
-            memory.save_experience_to_buffer(state_images, action, reward, new_state_images, done, goal_angle)
-            state_images = new_state_images
-            episode_reward += reward
-            distance_to_goal = distance
-            env.render(original_img, step, episode, valve_angle, goal_angle, done)
-            if done:
-                print("done ---> TRUE, breaking loop, end of this episode")
-                break
-
-            agent.update_function()
-        total_reward.append(episode_reward)
-        episode_distance_to_goal.append(distance_to_goal)
-
-        print(f"Episode {episode} End, Total reward: {episode_reward}, Final Distance to Goal: {distance_to_goal} \n")
-        if episode % 100 == 0:
-            agent.plot_results(total_reward, episode_distance_to_goal, check_point=True)
-
-    agent.save_models()
-    agent.plot_results(total_reward, episode_distance_to_goal, check_point=False)
-
-
-
-if __name__ == '__main__':
-    main_run()

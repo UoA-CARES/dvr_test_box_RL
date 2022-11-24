@@ -22,8 +22,8 @@ class VisionCamera:
         self.valve_mark_id = 6
         self.vision_flag_status = False
 
-        full_path_camera_matrix = "/home/david_lab/Repository/low_dimensiona_latent_space_RL/extra_utilities"
-        self.matrix = np.loadtxt((full_path_camera_matrix + "/matrix.txt"))
+        full_path_camera_matrix = "/home/david_lab/Repository/low_dimensiona_latent_space_RL/gripper_AE_environment/extra_utilities"
+        self.matrix     = np.loadtxt((full_path_camera_matrix + "/matrix.txt"))
         self.distortion = np.loadtxt((full_path_camera_matrix + "/distortion.txt"))
 
     def get_camera_image(self):
@@ -91,7 +91,6 @@ class VisionCamera:
                     valve_angle = np.array([self.get_angle(rvec[0][0])])
                     self.vision_flag_status = True
                     return valve_angle, self.vision_flag_status
-
                 else:
                     print("valve aruco marker no detected")
                     self.vision_flag_status = False
