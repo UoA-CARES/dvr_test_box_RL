@@ -199,6 +199,7 @@ def run_training(env, num_episodes_training, episode_horizont, agent):
 
 
 
+
 def define_parse_args():
     parser = ArgumentParser()
     parser.add_argument('--camera_index',     type=int, default=0)
