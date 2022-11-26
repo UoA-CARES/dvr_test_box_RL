@@ -3,9 +3,11 @@
     Algorithm: TD3- MFRL
     Version V3.0
     Date: 19/11/22
+    Modification: 26/11/2022
 """
 
 import numpy as np
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 import torch
@@ -20,7 +22,7 @@ from networks_architectures_v3 import Actor, Critic
 
 
 class TD3agent_rotation:
-    def __init__(self, env, device, memory_size, batch_size):
+    def __init__(self, env, device, memory_size, batch_size, G):
 
         # -------- Hyper-parameters --------------- #
         self.env    = env
@@ -32,18 +34,18 @@ class TD3agent_rotation:
         self.gamma = 0.99  # discount factor
         self.tau   = 0.005
 
-        self.G                  = 10
+        self.G                  = G
         self.update_counter     = 0
         self.policy_freq_update = 2
 
-        self.batch_size  = batch_size # 64
+        self.batch_size  = batch_size # 32
         self.num_states  = 16
         self.num_actions = 4
 
         self.max_memory_size = memory_size
 
-        self.hidden_size_critic = [1024, 1024, 1024]
-        self.hidden_size_actor  = [1024, 1024, 1024]
+        self.hidden_size_critic = [1024, 512, 256]
+        self.hidden_size_actor  = [1024, 512, 256]
 
         # ------------- Initialization memory --------------------- #
         self.memory = MemoryClass(self.max_memory_size, self.device)
@@ -64,6 +66,11 @@ class TD3agent_rotation:
         self.actor_optimizer  = optim.Adam(self.actor.parameters(),  lr=self.actor_learning_rate)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=self.critic_learning_rate)
 
+        self.actor.train(True)
+        self.critic.train(True)
+        self.actor_target.train(True)
+        self.critic_target.train(True)
+
 
     def get_action_from_policy(self, state):
         self.actor.eval() # i need this because i am using batch normalization on actor network
@@ -71,7 +78,7 @@ class TD3agent_rotation:
             state_tensor = torch.from_numpy(state).float().unsqueeze(0).to(self.device)  # numpy to a tensor with shape [1,16]
             action       = self.actor(state_tensor)
             action       = action.cpu().data.numpy().flatten()
-        self.actor.train()
+        self.actor.train(True)
         return action
 
 
@@ -104,6 +111,7 @@ class TD3agent_rotation:
             critic_loss_2 = F.mse_loss(q2, q_target)
             critic_loss_total = critic_loss_1 + critic_loss_2
 
+            # Critic step Update
             self.critic_optimizer.zero_grad()
             critic_loss_total.backward()
             self.critic_optimizer.step()
@@ -147,7 +155,7 @@ class TD3agent_rotation:
 
 def run_exploration(env, episodes, horizont, agent):
     mode = "Exploration"
-    for episode in range(1, episodes+1):
+    for episode in tqdm(range(1, episodes+1)):
         env.reset_env()
         for step in range(1, horizont+1):
             state, _ = env.state_space_function()
@@ -207,9 +215,11 @@ def define_parse_args():
     parser.add_argument('--robot_index',      type=str, default='robot-2')
     parser.add_argument('--replay_max_size',  type=int, default=20_000)
 
-    parser.add_argument('--batch_size',               type=int, default=64)
+
+    parser.add_argument('--batch_size',               type=int, default=32)
+    parser.add_argument('--G',                        type=int, default=10)
     parser.add_argument('--num_exploration_episodes', type=int, default=1_000)
-    parser.add_argument('--num_training_episodes',    type=int, default=4_000)
+    parser.add_argument('--num_training_episodes',    type=int, default=5_000)
     parser.add_argument('--episode_horizont',         type=int, default=20)
 
     args   = parser.parse_args()
@@ -220,9 +230,10 @@ def main_run():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     args   = define_parse_args()
+    print(args)
 
     env   = RL_ENV(camera_index=args.camera_index, device_index=args.usb_index)
-    agent = TD3agent_rotation(env=env, device=device,  memory_size=args.replay_max_size, batch_size=args.batch_size)
+    agent = TD3agent_rotation(env=env, device=device,  memory_size=args.replay_max_size, batch_size=args.batch_size, G=args.G)
 
     run_exploration(env, args.num_exploration_episodes, args.episode_horizont, agent)
     run_training(env, args.num_training_episodes, args.episode_horizont, agent)

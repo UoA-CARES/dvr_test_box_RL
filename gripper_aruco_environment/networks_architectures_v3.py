@@ -37,17 +37,18 @@ class Actor(nn.Module):
         super(Actor, self).__init__()
         self.act_net = nn.Sequential(
             nn.Linear(input_size, hidden_size[0]),
+            nn.BatchNorm1d(hidden_size[0]),
             nn.ReLU(),
             nn.Linear(hidden_size[0], hidden_size[1]),
+            nn.BatchNorm1d(hidden_size[1]),
             nn.ReLU(),
             nn.Linear(hidden_size[1], hidden_size[2]),
-            nn.BatchNorm1d(hidden_size[2]), # this is from my previous version, could be critical
-            #nn.LayerNorm(hidden_size[2]), # this new on this version
+            nn.BatchNorm1d(hidden_size[2]),
             nn.ReLU(),
-            nn.Linear(hidden_size[2], action_dim)
+            nn.Linear(hidden_size[2], action_dim),
+            nn.Tanh()
         )
 
     def forward(self, state):
         x = self.act_net(state)
-        x = torch.tanh(x)
         return x
