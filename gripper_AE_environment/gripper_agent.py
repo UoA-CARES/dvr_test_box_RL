@@ -157,28 +157,31 @@ class Td3Agent:
 
 
     def save_models(self):
-        torch.save(self.actor.state_dict(), f'trained_models/AE-TD3_actor_gripper.pht')
-        torch.save(self.critic.encoder_net.state_dict(), f'trained_models/AE-TD3_encoder_gripper.pht')
-        torch.save(self.decoder.state_dict(), f'trained_models/AE-TD3_decoder_gripper.pht')
+        torch.save(self.actor.state_dict(), f'trained_models/AE-TD3_actor_gripper_{self.include_goal_angle_on}.pht')
+        torch.save(self.critic.encoder_net.state_dict(), f'trained_models/AE-TD3_encoder_gripper_{self.include_goal_angle_on}.pht')
+        torch.save(self.decoder.state_dict(), f'trained_models/AE-TD3_decoder_gripper_{self.include_goal_angle_on}.pht')
         print("models have been saved...")
 
     def plot_results(self, rewards, distance, check_point=True):
         plt.figure(figsize=(20, 10))
 
-        plt.subplot(1, 3, 1)
+        plt.subplot(3, 1, 1)
         plt.title("Reward Raw Curve")
         plt.plot(rewards)
 
-        plt.subplot(1, 3, 2)
+        plt.subplot(3, 1, 2)
         plt.title("Final Distance to Goal")
         plt.plot(distance)
 
-        plt.subplot(1, 3, 3)
+        plt.subplot(3, 1, 3)
         plt.title("AE Loss Curve")
         plt.plot(self.ae_loss_record)
 
         if check_point:
             plt.savefig(f"plot_results/AE-TD3_gripper_check_point_image_include_goal_{self.include_goal_angle_on}.png")
+            np.savetxt(f"plot_results/AE-TD3_gripper_check_point_reward_curve_include_goal_{self.include_goal_angle_on}.txt", rewards)
+            np.savetxt(f"plot_results/AE-TD3_gripper_check_point_distance_curve_include_goal_{self.include_goal_angle_on}.txt", distance)
+            np.savetxt(f"plot_results/AE-TD3_gripper_check_point_ae_loss_curve_include_goal_{self.include_goal_angle_on}.txt", self.ae_loss_record)
         else:
             plt.savefig(f"plot_results/AE-TD3_gripper_reward_curve_include_goal_{self.include_goal_angle_on}.png")
             np.savetxt(f"plot_results/AE-TD3_gripper_reward_curve_include_goal_{self.include_goal_angle_on}.txt", rewards)

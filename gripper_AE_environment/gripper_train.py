@@ -24,7 +24,7 @@ from gripper_memory_utilities import MemoryClass, FrameStack
 def define_parse_args():
     parser = ArgumentParser()
     parser.add_argument('--k',                     type=int,  default=3)
-    parser.add_argument('--include_goal_angle_on', type=bool, default=True)
+    parser.add_argument('--include_goal_angle_on', type=bool, default=False)
     parser.add_argument('--camera_index',          type=int,  default=2)
     parser.add_argument('--usb_index',             type=int,  default=0)
     parser.add_argument('--robot_index',           type=str,  default='robot-1')
