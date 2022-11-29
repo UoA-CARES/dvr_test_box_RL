@@ -44,8 +44,8 @@ class TD3agent_rotation:
 
         self.max_memory_size = memory_size
 
-        self.hidden_size_critic = [1024, 512, 256]
-        self.hidden_size_actor  = [1024, 512, 256]
+        self.hidden_size_critic = [1024, 1024, 1024]
+        self.hidden_size_actor  = [1024, 1024, 1024]
 
         # ------------- Initialization memory --------------------- #
         self.memory = MemoryClass(self.max_memory_size, self.device)
@@ -73,12 +73,12 @@ class TD3agent_rotation:
 
 
     def get_action_from_policy(self, state):
-        self.actor.eval() # i need this because i am using batch normalization on actor network
+        self.actor.eval()
         with torch.no_grad():
             state_tensor = torch.from_numpy(state).float().unsqueeze(0).to(self.device)  # numpy to a tensor with shape [1,16]
             action       = self.actor(state_tensor)
             action       = action.cpu().data.numpy().flatten()
-        self.actor.train(True)
+        self.actor.train()
         return action
 
 
@@ -180,7 +180,7 @@ def run_training(env, num_episodes_training, episode_horizont, agent):
         for step in range(1, episode_horizont + 1):
             state, _ = env.state_space_function()
             action   = agent.get_action_from_policy(state)
-            noise    = np.random.normal(0, scale=0.15, size=4)
+            noise    = np.random.normal(0, scale=0.10, size=4)
             action   = action + noise
             action   = np.clip(action, -1, 1)
 
@@ -216,7 +216,7 @@ def define_parse_args():
     parser.add_argument('--replay_max_size',  type=int, default=20_000)
 
 
-    parser.add_argument('--batch_size',               type=int, default=32)
+    parser.add_argument('--batch_size',               type=int, default=100)
     parser.add_argument('--G',                        type=int, default=10)
     parser.add_argument('--num_exploration_episodes', type=int, default=1_000)
     parser.add_argument('--num_training_episodes',    type=int, default=5_000)

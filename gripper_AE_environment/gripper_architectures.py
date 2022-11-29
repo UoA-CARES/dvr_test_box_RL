@@ -101,10 +101,13 @@ class QFunction(nn.Module):
         self.trunk = nn.Sequential(
             nn.Linear(obs_dim + action_dim, hidden_dim[0]),
             nn.ReLU(),
+
             nn.Linear(hidden_dim[0], hidden_dim[1]),
             nn.ReLU(),
+
             nn.Linear(hidden_dim[1], hidden_dim[2]),
             nn.ReLU(),
+
             nn.Linear(hidden_dim[2], 1)
         )
 
@@ -149,13 +152,17 @@ class Actor(nn.Module):
         self.act_net = nn.Sequential(
             nn.Linear(input_dim, self.hidden_size[0]),
             nn.ReLU(),
+
             nn.Linear(self.hidden_size[0], self.hidden_size[1]),
             nn.ReLU(),
+            nn.BatchNorm1d(self.hidden_size[1]),
+
             nn.Linear(self.hidden_size[1], self.hidden_size[2]),
-            #nn.BatchNorm1d(self.hidden_size[2]), # this is from my previous, if use this i need eval mode when choose actions
-            nn.LayerNorm(self.hidden_size[2]),
             nn.ReLU(),
+            nn.BatchNorm1d(self.hidden_size[2]),  # this is new from previous version
+
             nn.Linear(self.hidden_size[2], action_dim),
+            nn.Tanh()
         )
         self.apply(weight_init)
 
@@ -163,12 +170,10 @@ class Actor(nn.Module):
         if target_on:
             z_vector = self.encoder_net(state, detach=detach_encoder)
             z_vector = torch.cat([z_vector, goal_angle], dim=1)
-            output = self.act_net(z_vector)
-            output = torch.tanh(output)
+            output   = self.act_net(z_vector)
         else:
             z_vector = self.encoder_net(state, detach=detach_encoder)
             output   = self.act_net(z_vector)
-            output   = torch.tanh(output)
         return output
 
 

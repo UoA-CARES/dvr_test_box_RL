@@ -34,7 +34,7 @@ class TD3Agent:
         self.max_action_value = env.action_space.high.max()
         self.env_name         = env.unwrapped.spec.id
 
-        self.G = 5  # internal loop for Policy update
+        self.G = 10  # internal loop for Policy update
 
         self.gamma      = 0.99
         self.tau        = 0.005

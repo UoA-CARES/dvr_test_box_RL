@@ -9,11 +9,14 @@ class QFunction(nn.Module):
         self.trunk = nn.Sequential(
             nn.Linear(obs_dim + action_dim, hidden_dim[0]),
             nn.ReLU(),
+
             nn.Linear(hidden_dim[0], hidden_dim[1]),
             nn.ReLU(),
+
             nn.Linear(hidden_dim[1], hidden_dim[2]),
             nn.ReLU(),
-            nn.Linear(hidden_dim[2], 1) # this is the main change wrt version 2
+
+            nn.Linear(hidden_dim[2], 1)
         )
 
     def forward(self, obs, action):
@@ -37,14 +40,16 @@ class Actor(nn.Module):
         super(Actor, self).__init__()
         self.act_net = nn.Sequential(
             nn.Linear(input_size, hidden_size[0]),
-            nn.BatchNorm1d(hidden_size[0]),
             nn.ReLU(),
+
             nn.Linear(hidden_size[0], hidden_size[1]),
+            nn.ReLU(),
             nn.BatchNorm1d(hidden_size[1]),
-            nn.ReLU(),
+
             nn.Linear(hidden_size[1], hidden_size[2]),
-            nn.BatchNorm1d(hidden_size[2]),
             nn.ReLU(),
+            nn.BatchNorm1d(hidden_size[2]),
+
             nn.Linear(hidden_size[2], action_dim),
             nn.Tanh()
         )

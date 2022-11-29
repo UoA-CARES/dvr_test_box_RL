@@ -7,6 +7,7 @@ Every state is rendered and passed as input to the autoencoder, after preprocess
 
 original image 510 x510 x 3 -->  Pendulum
               (400, 600, 3) -- > BipedalWalker
+
 Input for the encoder = 3 stacked frames, gray scalded, normalized and resized (84 , 84)
 The input is batch-size x 3 x 84 x 84, where the stacked number takes the place of the channel for covnet
 
@@ -62,7 +63,7 @@ class RLAgent:
         self.actor  = Actor(self.latent_dim, self.action_dim, self.max_action_value).to(self.device)
         self.critic = Critic(self.latent_dim, self.action_dim).to(self.device)
         # target networks
-        self.actor_target = Actor(self.latent_dim, self.action_dim, self.max_action_value).to(self.device)
+        self.actor_target  = Actor(self.latent_dim, self.action_dim, self.max_action_value).to(self.device)
         self.critic_target = Critic(self.latent_dim, self.action_dim).to(self.device)
 
         # tie encoders between actor and critic
@@ -90,11 +91,13 @@ class RLAgent:
         self.decoder.train(True)
 
     def select_action_from_policy(self, state_image_pixel):
+        self.actor.eval()
         with torch.no_grad():
             state_image_tensor = torch.FloatTensor(state_image_pixel)
             state_image_tensor = state_image_tensor.unsqueeze(0).to(self.device)
-            action = self.actor.forward(state_image_tensor)
+            action = self.actor(state_image_tensor)
             action = action.cpu().data.numpy()
+        self.actor.train()
         return action[0]
 
     def update_function(self):
@@ -257,7 +260,7 @@ def define_parse_args():
     parser = ArgumentParser()
     parser.add_argument('--k',          type=int, default=3)
     parser.add_argument('--G',          type=int, default=10)
-    parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--env_name',   type=str, default='Pendulum-v1')  # BipedalWalker-v3
     args   = parser.parse_args()
     return args
@@ -282,8 +285,8 @@ def main():
     else:
         num_exploration_episodes = 200
         num_training_episodes    = 1000
-        episode_horizont         = 500     # 1600
-        memory_size              = 100_000 # 320_000
+        episode_horizont         = 200     # 1600
+        memory_size              = 40_000 # 320_000
 
     agent        = RLAgent(env, memory_size, device, args.batch_size, args.G)
     frames_stack = FrameStack(args.k, env)

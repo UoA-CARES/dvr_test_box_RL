@@ -7,30 +7,42 @@ class Actor(nn.Module):
         super(Actor, self).__init__()
         self.max_value   = max_value
         self.encoder_net = Encoder(latent_dim)
+
+        self.hidden_size = [1024, 1024, 1024]
         self.act_net = nn.Sequential(
-            nn.Linear(latent_dim, 1024),
+
+            nn.Linear(latent_dim, self.hidden_size[0]),
             nn.ReLU(),
-            nn.Linear(1024, 1024),
+
+            nn.Linear(self.hidden_size[0], self.hidden_size[1]),
             nn.ReLU(),
-            nn.Linear(1024, action_dim),
+            nn.BatchNorm1d(self.hidden_size[1]),
+
+            nn.Linear(self.hidden_size[1], self.hidden_size[2]),
+            nn.ReLU(),
+            nn.BatchNorm1d(self.hidden_size[2]),
+
+            nn.Linear(self.hidden_size[2], action_dim),
+            nn.Tanh()
         )
         self.apply(weight_init)
 
     def forward(self, state, detach_encoder=False):
         z_vector = self.encoder_net(state, detach=detach_encoder)
         output   = self.act_net(z_vector)
-        output   = torch.tanh(output)
         return output * self.max_value
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class QFunction(nn.Module):
     def __init__(self, obs_dim, action_dim, hidden_dim):
         super().__init__()
         self.trunk = nn.Sequential(
-            nn.Linear(obs_dim + action_dim, hidden_dim),
+            nn.Linear(obs_dim + action_dim, hidden_dim[0]),
             nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(hidden_dim[0], hidden_dim[1]),
             nn.ReLU(),
-            nn.Linear(hidden_dim, 1)
+            nn.Linear(hidden_dim[1], hidden_dim[2]),
+            nn.ReLU(),
+            nn.Linear(hidden_dim[2], 1)
         )
 
     def forward(self, obs, action):
@@ -42,7 +54,7 @@ class Critic(nn.Module):
         super(Critic, self).__init__()
 
         self.encoder_net = Encoder(latent_dim)
-        self.hidden_dim  = 1024
+        self.hidden_dim  = [1024, 1024, 1024]
 
         self.Q1 = QFunction(latent_dim, action_dim, self.hidden_dim)
         self.Q2 = QFunction(latent_dim, action_dim, self.hidden_dim)
@@ -156,12 +168,14 @@ class Actor_Normal(nn.Module):
             nn.ReLU(),
             nn.Linear(self.hidden_size[0], self.hidden_size[1]),
             nn.ReLU(),
-            nn.Linear(self.hidden_size[1], self.actions_dim)
+            nn.Linear(self.hidden_size[1], self.hidden_size[2]),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size[2], self.actions_dim),
+            nn.Tanh()
         )
 
     def forward(self, state):
         x = self.actor_net(state)
-        x = torch.tanh(x)
         return x * self.max_value
 
 
@@ -171,7 +185,7 @@ class Critic_Normal(nn.Module):
 
         self.input_size  = obs_dim
         self.actions_dim = action_dim
-        self.hidden_dim  = 1024
+        self.hidden_dim = [1024, 1024, 1024]
 
         self.Q1 = QFunction(self.input_size, action_dim, self.hidden_dim)
         self.Q2 = QFunction(self.input_size, action_dim, self.hidden_dim)
