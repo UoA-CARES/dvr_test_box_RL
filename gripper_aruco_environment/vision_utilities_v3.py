@@ -61,7 +61,10 @@ class Vision:
         rotation_matrix, _ = cv2.Rodrigues(rot)
         psi, theta, phi = self.calculate_euler_angles(rotation_matrix)
         phi = math.degrees(phi)
+        if phi < 0:
+            phi = phi  + 360
         return phi
+
 
     def calculate_marker_pose(self, goal_angle):
         image = self.get_camera_image()

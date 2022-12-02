@@ -7,6 +7,7 @@ class QFunction(nn.Module):
         super().__init__()
 
         self.trunk = nn.Sequential(
+
             nn.Linear(obs_dim + action_dim, hidden_dim[0]),
             nn.ReLU(),
 
@@ -39,16 +40,17 @@ class Actor(nn.Module):
     def __init__(self, input_size, hidden_size, action_dim):
         super(Actor, self).__init__()
         self.act_net = nn.Sequential(
+
             nn.Linear(input_size, hidden_size[0]),
             nn.ReLU(),
 
             nn.Linear(hidden_size[0], hidden_size[1]),
             nn.ReLU(),
-            nn.BatchNorm1d(hidden_size[1]),
+            #nn.BatchNorm1d(hidden_size[1], affine=True),
 
             nn.Linear(hidden_size[1], hidden_size[2]),
             nn.ReLU(),
-            nn.BatchNorm1d(hidden_size[2]),
+            #nn.BatchNorm1d(hidden_size[2], affine=True),
 
             nn.Linear(hidden_size[2], action_dim),
             nn.Tanh()

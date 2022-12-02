@@ -46,8 +46,8 @@ class RLAgent:
         self.critic_lr = 1e-3  # 1e-3
         self.actor_lr  = 1e-4  # 1e-4
 
-        self.tau         = 0.005
-        self.tau_encoder = 0.001
+        self.tau         = 0.05 # 0.005
+        self.tau_encoder = 0.01 # 0.001
         self.gamma       = 0.99
 
         self.update_counter     = 0
@@ -97,7 +97,7 @@ class RLAgent:
             state_image_tensor = state_image_tensor.unsqueeze(0).to(self.device)
             action = self.actor(state_image_tensor)
             action = action.cpu().data.numpy()
-        self.actor.train()
+        self.actor.train(True)
         return action[0]
 
     def update_function(self):
@@ -260,7 +260,7 @@ def define_parse_args():
     parser = ArgumentParser()
     parser.add_argument('--k',          type=int, default=3)
     parser.add_argument('--G',          type=int, default=10)
-    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--env_name',   type=str, default='Pendulum-v1')  # BipedalWalker-v3
     args   = parser.parse_args()
     return args

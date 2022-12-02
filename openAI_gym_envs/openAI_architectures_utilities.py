@@ -8,7 +8,7 @@ class Actor(nn.Module):
         self.max_value   = max_value
         self.encoder_net = Encoder(latent_dim)
 
-        self.hidden_size = [1024, 1024, 1024]
+        self.hidden_size = [32, 32, 32]
         self.act_net = nn.Sequential(
 
             nn.Linear(latent_dim, self.hidden_size[0]),
@@ -16,11 +16,7 @@ class Actor(nn.Module):
 
             nn.Linear(self.hidden_size[0], self.hidden_size[1]),
             nn.ReLU(),
-            nn.BatchNorm1d(self.hidden_size[1]),
-
-            nn.Linear(self.hidden_size[1], self.hidden_size[2]),
-            nn.ReLU(),
-            nn.BatchNorm1d(self.hidden_size[2]),
+            nn.BatchNorm1d(self.hidden_size[1], affine=False),
 
             nn.Linear(self.hidden_size[2], action_dim),
             nn.Tanh()
@@ -36,12 +32,16 @@ class QFunction(nn.Module):
     def __init__(self, obs_dim, action_dim, hidden_dim):
         super().__init__()
         self.trunk = nn.Sequential(
+
             nn.Linear(obs_dim + action_dim, hidden_dim[0]),
             nn.ReLU(),
+
             nn.Linear(hidden_dim[0], hidden_dim[1]),
             nn.ReLU(),
+
             nn.Linear(hidden_dim[1], hidden_dim[2]),
             nn.ReLU(),
+
             nn.Linear(hidden_dim[2], 1)
         )
 
@@ -54,7 +54,7 @@ class Critic(nn.Module):
         super(Critic, self).__init__()
 
         self.encoder_net = Encoder(latent_dim)
-        self.hidden_dim  = [1024, 1024, 1024]
+        self.hidden_dim  = [32, 32, 32]
 
         self.Q1 = QFunction(latent_dim, action_dim, self.hidden_dim)
         self.Q2 = QFunction(latent_dim, action_dim, self.hidden_dim)
@@ -164,12 +164,18 @@ class Actor_Normal(nn.Module):
         self.max_value   = max_value
 
         self.actor_net = nn.Sequential(
+
             nn.Linear(self.input_size, self.hidden_size[0]),
             nn.ReLU(),
+
             nn.Linear(self.hidden_size[0], self.hidden_size[1]),
             nn.ReLU(),
+            #nn.BatchNorm1d(self.hidden_size[1], affine=True),
+
             nn.Linear(self.hidden_size[1], self.hidden_size[2]),
             nn.ReLU(),
+            #nn.BatchNorm1d(self.hidden_size[2], affine=True),
+
             nn.Linear(self.hidden_size[2], self.actions_dim),
             nn.Tanh()
         )

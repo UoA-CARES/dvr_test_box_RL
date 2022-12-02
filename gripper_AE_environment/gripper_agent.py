@@ -24,8 +24,8 @@ class Td3Agent:
         self.actor_lr   = 1e-4
 
         self.gamma       = 0.99
-        self.tau         = 0.005
-        self.tau_encoder = 0.001
+        self.tau         = 0.005  # 0.005
+        self.tau_encoder = 0.001  # 0.001
 
         self.G                  = 10
         self.update_counter     = 0
@@ -84,7 +84,7 @@ class Td3Agent:
             state_image_tensor = state_image_tensor.unsqueeze(0).to(self.device)  # torch.Size([1, 3, 84, 84])
             action = self.actor(state_image_tensor, goal_angle_tensor, self.include_goal_angle_on)
         action = action.cpu().data.numpy().flatten()
-        self.actor.train()
+        self.actor.train(True)
         return action
 
     def update_function(self):

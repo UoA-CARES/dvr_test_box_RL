@@ -79,8 +79,8 @@ class ENV:
 
 
     def define_goal_angle(self):
-        # self.goal_angle_deg = random.randint(0, 360)
-        self.goal_angle_deg = random.randint(-180, 180)
+        self.goal_angle_deg = random.randint(0, 360)
+        #self.goal_angle_deg = random.randint(-180, 180)
         print("New Goal Angle Generated", self.goal_angle_deg)
         return self.goal_angle_deg
 
@@ -88,9 +88,10 @@ class ENV:
     def calculate_extrinsic_reward(self, target_angle, valve_angle):
         angle_difference = np.abs(target_angle - valve_angle)
 
-        if angle_difference <= 10:
+        if angle_difference <= 5:
             done = True
-            reward_ext = np.float64(1000)
+            #reward_ext = np.float64(1000)
+            reward_ext = -angle_difference
         else:
             done = False
             reward_ext = -angle_difference

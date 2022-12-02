@@ -57,7 +57,8 @@ class RL_ENV:
         self.define_goal_angle()
 
     def define_goal_angle(self):
-        self.goal_angle = random.randint(-180, 180)
+        #self.goal_angle = random.randint(-180, 180)
+        self.goal_angle  = random.randint(0, 360)
         print("New Goal Angle Generated", self.goal_angle)
         #return self.goal_angle
 
@@ -95,13 +96,17 @@ class RL_ENV:
     def calculate_reward(self):
         cylinder_angle_single    = self.cylinder_angle[0]
         difference_cylinder_goal = np.abs(cylinder_angle_single - self.goal_angle)
-        if difference_cylinder_goal <= 10:
-            done = True
-            reward_d = np.float64(1000)
+
+        if difference_cylinder_goal <= 5:
+            done     = True
+            reward_d = np.float64(100)
+            #reward_d = -difference_cylinder_goal
         else:
             done = False
-            reward_d = -difference_cylinder_goal
-        return reward_d, done
+            #reward_d = -difference_cylinder_goal
+            reward_d = np.float64(-1)
+
+        return reward_d, done, difference_cylinder_goal
 
 
     def env_render(self, image=None, done=False, step=1, episode=1, cylinder=0, mode="exploration"):

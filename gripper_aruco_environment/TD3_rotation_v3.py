@@ -44,8 +44,8 @@ class TD3agent_rotation:
 
         self.max_memory_size = memory_size
 
-        self.hidden_size_critic = [1024, 1024, 1024]
-        self.hidden_size_actor  = [1024, 1024, 1024]
+        self.hidden_size_critic = [32, 32, 32]
+        self.hidden_size_actor  = [32, 32, 32]
 
         # ------------- Initialization memory --------------------- #
         self.memory = MemoryClass(self.max_memory_size, self.device)
@@ -73,12 +73,12 @@ class TD3agent_rotation:
 
 
     def get_action_from_policy(self, state):
-        self.actor.eval()
+        #self.actor.eval()
         with torch.no_grad():
             state_tensor = torch.from_numpy(state).float().unsqueeze(0).to(self.device)  # numpy to a tensor with shape [1,16]
             action       = self.actor(state_tensor)
             action       = action.cpu().data.numpy().flatten()
-        self.actor.train()
+        #self.actor.train(True)
         return action
 
 
@@ -141,14 +141,24 @@ class TD3agent_rotation:
         print("models has been saved...")
 
 
-    def plot_reward_curves(self, rewards, number=1):
-        plt.figure(number, figsize=(20, 10))
-        plt.plot(rewards)
-        plt.plot()
+    def plot_reward_curves(self, rewards, distance):
+        plt.figure(figsize=(20, 10))
+
+        plt.subplot(2, 1, 1)
+        plt.title("Reward Raw Curve")
         plt.xlabel('Episode')
         plt.ylabel('Reward')
-        plt.savefig(f"plot_results/TD3_rewards.png")
-        np.savetxt(f'plot_results/TD3_rewards.txt', rewards)
+        plt.plot(rewards)
+
+        plt.subplot(2, 1, 2)
+        plt.title("Final Distance to Goal")
+        plt.ylabel('Distance')
+        plt.plot(distance)
+
+        plt.savefig(f"plot_results/TD3_rewards_gripper.png")
+
+        np.savetxt(f'plot_results/TD3_rewards_gripper.txt', rewards)
+        np.savetxt(f'plot_results/TD3_distance_gripper.txt', distance)
         print("training curve has been saved...")
         # plt.show()
 
@@ -162,7 +172,7 @@ def run_exploration(env, episodes, horizont, agent):
             action   = env.generate_sample_act()
             env.env_step(action)
             next_state, image_state = env.state_space_function()
-            reward, done = env.calculate_reward()
+            reward, done, distance_to_goal = env.calculate_reward()
             agent.memory.replay_buffer_add(state, action, reward, next_state, done)
             env.env_render(image=image_state, episode=episode, step=step, done=done, mode=mode, cylinder=next_state[-2:-1])
             if done:
@@ -174,20 +184,22 @@ def run_exploration(env, episodes, horizont, agent):
 def run_training(env, num_episodes_training, episode_horizont, agent):
     mode    = "Training TD3"
     rewards = []
+    episodes_distance_to_goal = []
     for episode in range(1, num_episodes_training + 1):
         env.reset_env()
-        episode_reward = 0
+        episode_reward   = 0
+        distance_to_goal = 0
         for step in range(1, episode_horizont + 1):
             state, _ = env.state_space_function()
             action   = agent.get_action_from_policy(state)
-            noise    = np.random.normal(0, scale=0.10, size=4)
+            noise    = np.random.normal(0, scale=0.15, size=4)
             action   = action + noise
             action   = np.clip(action, -1, 1)
 
             env.env_step(action)
 
             next_state, image_state = env.state_space_function()
-            reward, done    = env.calculate_reward()
+            reward, done, distance_to_goal  = env.calculate_reward()
             episode_reward += reward
 
             agent.memory.replay_buffer_add(state, action, reward, next_state, done)
@@ -197,13 +209,15 @@ def run_training(env, num_episodes_training, episode_horizont, agent):
             agent.step_training()
 
         rewards.append(episode_reward)
+        episodes_distance_to_goal.append(distance_to_goal)
+
         print(f"******* -----Episode {episode} Ended-----********* ")
-        print("Episode total reward:", episode_reward, "\n")
+        print(f"Episode Total reward: {episode_reward}, Final Distance to Goal: {distance_to_goal} \n")
 
         if episode % 100 == 0:
-            agent.plot_reward_curves(rewards, number=1)
+            agent.plot_reward_curves(rewards, episodes_distance_to_goal)
     agent.save_model()
-    agent.plot_reward_curves(rewards, number=1)
+    agent.plot_reward_curves(rewards, episodes_distance_to_goal)
 
 
 
@@ -213,14 +227,14 @@ def define_parse_args():
     parser.add_argument('--camera_index',     type=int, default=0)
     parser.add_argument('--usb_index',        type=int, default=1)
     parser.add_argument('--robot_index',      type=str, default='robot-2')
-    parser.add_argument('--replay_max_size',  type=int, default=20_000)
+    parser.add_argument('--replay_max_size',  type=int, default=100_000)
 
 
-    parser.add_argument('--batch_size',               type=int, default=100)
+    parser.add_argument('--batch_size',               type=int, default=64)
     parser.add_argument('--G',                        type=int, default=10)
     parser.add_argument('--num_exploration_episodes', type=int, default=1_000)
     parser.add_argument('--num_training_episodes',    type=int, default=5_000)
-    parser.add_argument('--episode_horizont',         type=int, default=20)
+    parser.add_argument('--episode_horizont',         type=int, default=30)
 
     args   = parser.parse_args()
     return args

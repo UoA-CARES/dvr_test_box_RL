@@ -119,12 +119,14 @@ class TD3Agent:
         print("models have been saved...")
 
     def get_action_from_policy(self, state):
+        #self.actor.eval()
         with torch.no_grad():
             state_tensor = torch.FloatTensor(state)
             state_tensor = state_tensor.unsqueeze(0)
             state_tensor = state_tensor.to(self.device)
             action = self.actor(state_tensor)
             action = action.cpu().data.numpy()
+        #self.actor.train(True)
         return action[0]
 
     def plot_functions(self, rewards):
@@ -176,8 +178,8 @@ def run_exploration(env, agent,  num_exploration_episodes, episode_horizont):
 def main_run():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    env = gym.make('Pendulum-v1')
-    #env = gym.make("BipedalWalker-v3")
+    #env = gym.make('Pendulum-v1')
+    env = gym.make("BipedalWalker-v3")
 
     env_name         = env.unwrapped.spec.id
     max_action_value = env.action_space.high.max()

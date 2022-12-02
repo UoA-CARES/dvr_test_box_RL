@@ -75,8 +75,8 @@ class VisionCamera:
         rotation_matrix, _ = cv2.Rodrigues(rot)
         psi, theta, phi = self.calculate_euler_angles(rotation_matrix)
         phi = math.degrees(phi)
-        #if phi < -0:
-            #phi = phi  + 360
+        if phi < -0:
+            phi = phi  + 360
         return phi
 
 

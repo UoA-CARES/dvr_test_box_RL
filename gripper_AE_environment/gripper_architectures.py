@@ -155,11 +155,11 @@ class Actor(nn.Module):
 
             nn.Linear(self.hidden_size[0], self.hidden_size[1]),
             nn.ReLU(),
-            nn.BatchNorm1d(self.hidden_size[1]),
+            nn.BatchNorm1d(self.hidden_size[1], affine=True),
 
             nn.Linear(self.hidden_size[1], self.hidden_size[2]),
             nn.ReLU(),
-            nn.BatchNorm1d(self.hidden_size[2]),  # this is new from previous version
+            nn.BatchNorm1d(self.hidden_size[2], affine=True),  # this is new from previous version
 
             nn.Linear(self.hidden_size[2], action_dim),
             nn.Tanh()
