@@ -73,12 +73,12 @@ class TD3agent_rotation:
 
 
     def get_action_from_policy(self, state):
-        #self.actor.eval()
+        self.actor.eval()
         with torch.no_grad():
             state_tensor = torch.from_numpy(state).float().unsqueeze(0).to(self.device)  # numpy to a tensor with shape [1,16]
             action       = self.actor(state_tensor)
             action       = action.cpu().data.numpy().flatten()
-        #self.actor.train(True)
+        self.actor.train(True)
         return action
 
 
@@ -233,7 +233,7 @@ def define_parse_args():
     parser.add_argument('--batch_size',               type=int, default=64)
     parser.add_argument('--G',                        type=int, default=10)
     parser.add_argument('--num_exploration_episodes', type=int, default=1_000)
-    parser.add_argument('--num_training_episodes',    type=int, default=5_000)
+    parser.add_argument('--num_training_episodes',    type=int, default=10_000)
     parser.add_argument('--episode_horizont',         type=int, default=30)
 
     args   = parser.parse_args()

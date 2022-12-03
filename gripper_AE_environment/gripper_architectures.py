@@ -105,8 +105,8 @@ class QFunction(nn.Module):
             nn.Linear(hidden_dim[0], hidden_dim[1]),
             nn.ReLU(),
 
-            nn.Linear(hidden_dim[1], hidden_dim[2]),
-            nn.ReLU(),
+            #nn.Linear(hidden_dim[1], hidden_dim[2]),
+            #nn.ReLU(),
 
             nn.Linear(hidden_dim[2], 1)
         )
@@ -157,9 +157,9 @@ class Actor(nn.Module):
             nn.ReLU(),
             nn.BatchNorm1d(self.hidden_size[1], affine=True),
 
-            nn.Linear(self.hidden_size[1], self.hidden_size[2]),
-            nn.ReLU(),
-            nn.BatchNorm1d(self.hidden_size[2], affine=True),  # this is new from previous version
+            #nn.Linear(self.hidden_size[1], self.hidden_size[2]),
+            #nn.ReLU(),
+            #nn.BatchNorm1d(self.hidden_size[2], affine=True),  # this is new from previous version
 
             nn.Linear(self.hidden_size[2], action_dim),
             nn.Tanh()
