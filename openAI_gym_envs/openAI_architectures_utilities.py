@@ -39,8 +39,8 @@ class QFunction(nn.Module):
             nn.Linear(hidden_dim[0], hidden_dim[1]),
             nn.ReLU(),
 
-            #nn.Linear(hidden_dim[1], hidden_dim[2]),
-            #nn.ReLU(),
+            nn.Linear(hidden_dim[1], hidden_dim[2]),
+            nn.ReLU(),
 
             nn.Linear(hidden_dim[2], 1)
         )
@@ -160,7 +160,7 @@ class Actor_Normal(nn.Module):
 
         self.input_size  = obs_dim
         self.actions_dim = actions_dim
-        self.hidden_size = [1024, 1024, 1024]
+        self.hidden_size = [128, 64, 32]
         self.max_value   = max_value
 
         self.actor_net = nn.Sequential(
@@ -170,11 +170,12 @@ class Actor_Normal(nn.Module):
 
             nn.Linear(self.hidden_size[0], self.hidden_size[1]),
             nn.ReLU(),
-            #nn.BatchNorm1d(self.hidden_size[1], affine=True),
+            nn.BatchNorm1d(self.hidden_size[1]),
 
-            #nn.Linear(self.hidden_size[1], self.hidden_size[2]),
-            #nn.ReLU(),
-            #nn.BatchNorm1d(self.hidden_size[2], affine=True),
+
+            nn.Linear(self.hidden_size[1], self.hidden_size[2]),
+            nn.ReLU(),
+            nn.BatchNorm1d(self.hidden_size[2]),
 
             nn.Linear(self.hidden_size[2], self.actions_dim),
             nn.Tanh()
@@ -191,7 +192,7 @@ class Critic_Normal(nn.Module):
 
         self.input_size  = obs_dim
         self.actions_dim = action_dim
-        self.hidden_dim = [1024, 1024, 1024]
+        self.hidden_dim = [128, 64, 32]
 
         self.Q1 = QFunction(self.input_size, action_dim, self.hidden_dim)
         self.Q2 = QFunction(self.input_size, action_dim, self.hidden_dim)

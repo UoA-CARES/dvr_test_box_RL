@@ -38,7 +38,7 @@ class TD3Agent:
 
         self.gamma      = 0.99
         self.tau        = 0.005
-        self.batch_size = 64
+        self.batch_size = 32
 
         self.update_counter     = 0
         self.policy_freq_update = 2
@@ -119,14 +119,14 @@ class TD3Agent:
         print("models have been saved...")
 
     def get_action_from_policy(self, state):
-        #self.actor.eval()
+        self.actor.eval()
         with torch.no_grad():
             state_tensor = torch.FloatTensor(state)
             state_tensor = state_tensor.unsqueeze(0)
             state_tensor = state_tensor.to(self.device)
             action = self.actor(state_tensor)
             action = action.cpu().data.numpy()
-        #self.actor.train(True)
+        self.actor.train(True)
         return action[0]
 
     def plot_functions(self, rewards):

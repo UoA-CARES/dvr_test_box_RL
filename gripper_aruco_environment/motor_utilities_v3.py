@@ -51,8 +51,8 @@ class Motor:
         # Configuration values
         self.TORQUE_ENABLE  = 1  # Value for enabling the torque
         self.TORQUE_DISABLE = 0  # Value for disabling the torque
-        self.DXL_MAX_VELOCITY_VALUE = 115  # Value for limited the speed. Max possible value=2047 meaning max speed
-        self.DXL_MAX_TORQUE_VALUE   = 115  # It is the torque value of maximum output. 0 to 1,023 can be used
+        self.DXL_MAX_VELOCITY_VALUE = 120  # Value for limited the speed. Max possible value=2047 meaning max speed
+        self.DXL_MAX_TORQUE_VALUE   = 120  # It is the torque value of maximum output. 0 to 1,023 can be used
 
         # Initialize PacketHandler instance
         self.portHandler   = PortHandler(DEVICENAME)

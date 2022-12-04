@@ -90,8 +90,8 @@ class ENV:
 
         if angle_difference <= 5:
             done = True
-            #reward_ext = np.float64(100)
-            reward_ext = -angle_difference
+            reward_ext = np.float64(100)
+            #reward_ext = -angle_difference
         else:
             done = False
             #reward_ext = np.float64(-1)

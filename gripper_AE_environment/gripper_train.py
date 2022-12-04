@@ -30,10 +30,10 @@ def define_parse_args():
     parser.add_argument('--robot_index',           type=str,  default='robot-1')
     parser.add_argument('--replay_max_size',       type=int,  default=100_000)
 
-    parser.add_argument('--batch_size',               type=int,  default=64)
+    parser.add_argument('--batch_size',               type=int,  default=32)
     parser.add_argument('--num_exploration_episodes', type=int,  default=1_000)
     parser.add_argument('--num_training_episodes',    type=int,  default=10_000)
-    parser.add_argument('--episode_horizont',         type=int,  default=30)
+    parser.add_argument('--episode_horizont',         type=int,  default=40)
 
     args   = parser.parse_args()
     return args
@@ -95,7 +95,7 @@ def train_function(env, agent, frames_stack, memory, num_training_episodes, epis
         distance_to_goal = 0
         for step in range(1, episode_horizont + 1):
             action = agent.select_action_from_policy(state_images, goal_angle)
-            noise  = np.random.normal(0, scale=0.15, size=4)
+            noise  = np.random.normal(0, scale=0.1, size=4)
             action = action + noise
             action = np.clip(action, -1, 1)
             new_state_images, reward, done, distance_to_goal, original_img, valve_angle = frames_stack.step(action, goal_angle)

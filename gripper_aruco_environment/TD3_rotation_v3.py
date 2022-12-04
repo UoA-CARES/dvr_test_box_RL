@@ -44,8 +44,8 @@ class TD3agent_rotation:
 
         self.max_memory_size = memory_size
 
-        self.hidden_size_critic = [32, 32, 32]
-        self.hidden_size_actor  = [32, 32, 32]
+        self.hidden_size_critic = [128, 64, 32]
+        self.hidden_size_actor  = [128, 64, 32]
 
         # ------------- Initialization memory --------------------- #
         self.memory = MemoryClass(self.max_memory_size, self.device)
@@ -192,7 +192,7 @@ def run_training(env, num_episodes_training, episode_horizont, agent):
         for step in range(1, episode_horizont + 1):
             state, _ = env.state_space_function()
             action   = agent.get_action_from_policy(state)
-            noise    = np.random.normal(0, scale=0.15, size=4)
+            noise    = np.random.normal(0, scale=0.10, size=4)
             action   = action + noise
             action   = np.clip(action, -1, 1)
 
@@ -230,11 +230,11 @@ def define_parse_args():
     parser.add_argument('--replay_max_size',  type=int, default=100_000)
 
 
-    parser.add_argument('--batch_size',               type=int, default=64)
+    parser.add_argument('--batch_size',               type=int, default=32)
     parser.add_argument('--G',                        type=int, default=10)
     parser.add_argument('--num_exploration_episodes', type=int, default=1_000)
     parser.add_argument('--num_training_episodes',    type=int, default=10_000)
-    parser.add_argument('--episode_horizont',         type=int, default=30)
+    parser.add_argument('--episode_horizont',         type=int, default=40)
 
     args   = parser.parse_args()
     return args

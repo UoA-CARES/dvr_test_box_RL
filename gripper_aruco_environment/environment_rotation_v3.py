@@ -99,8 +99,8 @@ class RL_ENV:
 
         if difference_cylinder_goal <= 5:
             done     = True
-            #reward_d = np.float64(100)
-            reward_d = -difference_cylinder_goal
+            reward_d = np.float64(100)
+            #reward_d = -difference_cylinder_goal
         else:
             done = False
             reward_d = -difference_cylinder_goal

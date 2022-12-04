@@ -105,8 +105,8 @@ class QFunction(nn.Module):
             nn.Linear(hidden_dim[0], hidden_dim[1]),
             nn.ReLU(),
 
-            #nn.Linear(hidden_dim[1], hidden_dim[2]),
-            #nn.ReLU(),
+            nn.Linear(hidden_dim[1], hidden_dim[2]),
+            nn.ReLU(),
 
             nn.Linear(hidden_dim[2], 1)
         )
@@ -121,7 +121,7 @@ class Critic(nn.Module):
         super(Critic, self).__init__()
 
         self.encoder_net = Encoder(latent_dim)
-        self.hidden_dim  = [1024, 1024, 1024]
+        self.hidden_dim  = [128, 64, 32]
 
         self.Q1 = QFunction(input_dim, action_dim, self.hidden_dim)
         self.Q2 = QFunction(input_dim, action_dim, self.hidden_dim)
@@ -147,7 +147,7 @@ class Actor(nn.Module):
     def __init__(self, latent_dim, input_dim, action_dim):
         super(Actor, self).__init__()
         self.encoder_net = Encoder(latent_dim)
-        self.hidden_size = [1024, 1024, 1024]
+        self.hidden_size = [128, 64, 32]
 
         self.act_net = nn.Sequential(
             nn.Linear(input_dim, self.hidden_size[0]),
@@ -155,11 +155,11 @@ class Actor(nn.Module):
 
             nn.Linear(self.hidden_size[0], self.hidden_size[1]),
             nn.ReLU(),
-            nn.BatchNorm1d(self.hidden_size[1], affine=True),
+            nn.BatchNorm1d(self.hidden_size[1]),
 
-            #nn.Linear(self.hidden_size[1], self.hidden_size[2]),
-            #nn.ReLU(),
-            #nn.BatchNorm1d(self.hidden_size[2], affine=True),  # this is new from previous version
+            nn.Linear(self.hidden_size[1], self.hidden_size[2]),
+            nn.ReLU(),
+            nn.BatchNorm1d(self.hidden_size[2]),  # this is new from previous version
 
             nn.Linear(self.hidden_size[2], action_dim),
             nn.Tanh()
