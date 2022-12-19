@@ -5,6 +5,7 @@
     Date: 19/11/22
     Modification: 26/11/2022
 """
+import random
 
 import numpy as np
 from tqdm import tqdm
@@ -38,14 +39,14 @@ class TD3agent_rotation:
         self.update_counter     = 0
         self.policy_freq_update = 2
 
-        self.batch_size  = batch_size # 32
+        self.batch_size  = batch_size
         self.num_states  = 14
         self.num_actions = 4
 
         self.max_memory_size = memory_size
 
-        self.hidden_size_critic = [128, 64, 32]
-        self.hidden_size_actor  = [128, 64, 32]
+        self.hidden_size_critic = [256, 256, 256]
+        self.hidden_size_actor  = [256, 256, 256]
 
         # ------------- Initialization memory --------------------- #
         self.memory = MemoryClass(self.max_memory_size, self.device)
@@ -75,7 +76,7 @@ class TD3agent_rotation:
     def get_action_from_policy(self, state):
         self.actor.eval()
         with torch.no_grad():
-            state_tensor = torch.from_numpy(state).float().unsqueeze(0).to(self.device)  # numpy to a tensor with shape [1,16]
+            state_tensor = torch.from_numpy(state).float().unsqueeze(0).to(self.device)  # numpy to a tensor with shape [1,14]
             action       = self.actor(state_tensor)
             action       = action.cpu().data.numpy().flatten()
         self.actor.train(True)
@@ -172,10 +173,7 @@ def run_exploration(env, episodes, horizont, agent):
             action   = env.generate_sample_act()
             env.env_step(action)
             next_state, image_state, valve_angel_after = env.state_space_function()
-
             reward, done, distance_to_goal = env.calculate_reward(valve_angel_before, valve_angel_after)
-            print(reward)
-
             agent.memory.replay_buffer_add(state, action, reward, next_state, done)
             env.env_render(image=image_state, episode=episode, step=step, done=done, mode=mode, cylinder=next_state[-2:-1])
             if done:
@@ -192,24 +190,24 @@ def run_training(env, num_episodes_training, episode_horizont, agent):
         env.reset_env()
         episode_reward   = 0
         distance_to_goal = 0
+
         for step in range(1, episode_horizont + 1):
             state, _, valve_angel_before = env.state_space_function()
             action   = agent.get_action_from_policy(state)
-            noise    = np.random.normal(0, scale=0.10, size=4)
+            noise    = np.random.normal(0, scale=0.15, size=4)
             action   = action + noise
             action   = np.clip(action, -1, 1)
-
             env.env_step(action)
-
             next_state, image_state, valve_angel_after = env.state_space_function()
             reward, done, distance_to_goal  = env.calculate_reward(valve_angel_before, valve_angel_after)
             episode_reward += reward
-
             agent.memory.replay_buffer_add(state, action, reward, next_state, done)
             env.env_render(image=image_state, episode=episode, step=step, done=done, mode=mode, cylinder=next_state[-2:-1])
+
+            agent.step_training()
+
             if done:
                 break
-            agent.step_training()
 
         rewards.append(episode_reward)
         episodes_distance_to_goal.append(distance_to_goal)
@@ -224,18 +222,17 @@ def run_training(env, num_episodes_training, episode_horizont, agent):
 
 
 
-
 def define_parse_args():
     parser = ArgumentParser()
     parser.add_argument('--camera_index',     type=int, default=0)
     parser.add_argument('--usb_index',        type=int, default=1)
     parser.add_argument('--robot_index',      type=str, default='robot-2')
-    parser.add_argument('--replay_max_size',  type=int, default=10_000)
+    parser.add_argument('--replay_max_size',  type=int, default=100_000)
 
-
-    parser.add_argument('--batch_size',               type=int, default=32)
+    parser.add_argument('--seed',                     type=int, default=100)
+    parser.add_argument('--batch_size',               type=int, default=256)
     parser.add_argument('--G',                        type=int, default=10)
-    parser.add_argument('--num_exploration_episodes', type=int, default=500)
+    parser.add_argument('--num_exploration_episodes', type=int, default=1_000)
     parser.add_argument('--num_training_episodes',    type=int, default=10_000)
     parser.add_argument('--episode_horizont',         type=int, default=20)
 
@@ -247,10 +244,13 @@ def main_run():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     args   = define_parse_args()
-    print(args)
 
     env   = RL_ENV(camera_index=args.camera_index, device_index=args.usb_index)
     agent = TD3agent_rotation(env=env, device=device,  memory_size=args.replay_max_size, batch_size=args.batch_size, G=args.G)
+
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
 
     run_exploration(env, args.num_exploration_episodes, args.episode_horizont, agent)
     run_training(env, args.num_training_episodes, args.episode_horizont, agent)
