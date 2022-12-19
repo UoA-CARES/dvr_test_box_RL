@@ -85,7 +85,8 @@ class ENV:
         return self.goal_angle_deg
 
 
-    def calculate_extrinsic_reward(self, target_angle, valve_angle):
+    def calculate_extrinsic_reward(self, target_angle, valve_angle_previous, valve_angle_after):
+        '''
         angle_difference = np.abs(target_angle - valve_angle)
 
         if angle_difference <= 5:
@@ -96,6 +97,24 @@ class ENV:
             done = False
             #reward_ext = np.float64(-1)
             reward_ext = -angle_difference
+
+        return reward_ext, done, angle_difference
+        '''
+        # new reward function:
+        delta_changes    = np.abs(target_angle - valve_angle_previous) - np.abs(target_angle - valve_angle_after)
+        angle_difference = np.abs(target_angle - valve_angle_after)
+
+        if -5 <= delta_changes <= 5:
+            # noise or no changes
+            reward_ext = 0
+        else:
+            reward_ext = delta_changes
+
+        if angle_difference <= 5:
+            reward_ext = reward_ext + 100
+            done = True
+        else:
+            done = False
 
         return reward_ext, done, angle_difference
 

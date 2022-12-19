@@ -39,7 +39,7 @@ class TD3agent_rotation:
         self.policy_freq_update = 2
 
         self.batch_size  = batch_size # 32
-        self.num_states  = 16
+        self.num_states  = 14
         self.num_actions = 4
 
         self.max_memory_size = memory_size
@@ -168,11 +168,14 @@ def run_exploration(env, episodes, horizont, agent):
     for episode in tqdm(range(1, episodes+1)):
         env.reset_env()
         for step in range(1, horizont+1):
-            state, _ = env.state_space_function()
+            state, _, valve_angel_before = env.state_space_function()
             action   = env.generate_sample_act()
             env.env_step(action)
-            next_state, image_state = env.state_space_function()
-            reward, done, distance_to_goal = env.calculate_reward()
+            next_state, image_state, valve_angel_after = env.state_space_function()
+
+            reward, done, distance_to_goal = env.calculate_reward(valve_angel_before, valve_angel_after)
+            print(reward)
+
             agent.memory.replay_buffer_add(state, action, reward, next_state, done)
             env.env_render(image=image_state, episode=episode, step=step, done=done, mode=mode, cylinder=next_state[-2:-1])
             if done:
@@ -190,7 +193,7 @@ def run_training(env, num_episodes_training, episode_horizont, agent):
         episode_reward   = 0
         distance_to_goal = 0
         for step in range(1, episode_horizont + 1):
-            state, _ = env.state_space_function()
+            state, _, valve_angel_before = env.state_space_function()
             action   = agent.get_action_from_policy(state)
             noise    = np.random.normal(0, scale=0.10, size=4)
             action   = action + noise
@@ -198,8 +201,8 @@ def run_training(env, num_episodes_training, episode_horizont, agent):
 
             env.env_step(action)
 
-            next_state, image_state = env.state_space_function()
-            reward, done, distance_to_goal  = env.calculate_reward()
+            next_state, image_state, valve_angel_after = env.state_space_function()
+            reward, done, distance_to_goal  = env.calculate_reward(valve_angel_before, valve_angel_after)
             episode_reward += reward
 
             agent.memory.replay_buffer_add(state, action, reward, next_state, done)
@@ -227,14 +230,14 @@ def define_parse_args():
     parser.add_argument('--camera_index',     type=int, default=0)
     parser.add_argument('--usb_index',        type=int, default=1)
     parser.add_argument('--robot_index',      type=str, default='robot-2')
-    parser.add_argument('--replay_max_size',  type=int, default=100_000)
+    parser.add_argument('--replay_max_size',  type=int, default=10_000)
 
 
     parser.add_argument('--batch_size',               type=int, default=32)
     parser.add_argument('--G',                        type=int, default=10)
-    parser.add_argument('--num_exploration_episodes', type=int, default=1_000)
+    parser.add_argument('--num_exploration_episodes', type=int, default=500)
     parser.add_argument('--num_training_episodes',    type=int, default=10_000)
-    parser.add_argument('--episode_horizont',         type=int, default=40)
+    parser.add_argument('--episode_horizont',         type=int, default=20)
 
     args   = parser.parse_args()
     return args

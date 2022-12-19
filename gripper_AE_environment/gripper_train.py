@@ -28,12 +28,12 @@ def define_parse_args():
     parser.add_argument('--camera_index',          type=int,  default=2)
     parser.add_argument('--usb_index',             type=int,  default=0)
     parser.add_argument('--robot_index',           type=str,  default='robot-1')
-    parser.add_argument('--replay_max_size',       type=int,  default=100_000)
+    parser.add_argument('--replay_max_size',       type=int,  default=20_000)
 
     parser.add_argument('--batch_size',               type=int,  default=32)
     parser.add_argument('--num_exploration_episodes', type=int,  default=1_000)
     parser.add_argument('--num_training_episodes',    type=int,  default=10_000)
-    parser.add_argument('--episode_horizont',         type=int,  default=40)
+    parser.add_argument('--episode_horizont',         type=int,  default=20)
 
     args   = parser.parse_args()
     return args

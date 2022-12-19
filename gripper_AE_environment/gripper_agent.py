@@ -76,7 +76,7 @@ class Td3Agent:
         self.decoder.train(True)
 
     def select_action_from_policy(self, state_image_pixel, goal_angle):
-        self.actor.eval()
+        #self.actor.eval()
         with torch.no_grad():
             goal_angle         = np.array(goal_angle).reshape(-1, 1)
             goal_angle_tensor  = torch.FloatTensor(goal_angle).to(self.device)  # torch.Size([1, 1])
@@ -84,7 +84,7 @@ class Td3Agent:
             state_image_tensor = state_image_tensor.unsqueeze(0).to(self.device)  # torch.Size([1, 3, 84, 84])
             action = self.actor(state_image_tensor, goal_angle_tensor, self.include_goal_angle_on)
         action = action.cpu().data.numpy().flatten()
-        self.actor.train(True)
+        #self.actor.train(True)
         return action
 
     def update_function(self):

@@ -71,11 +71,18 @@ class FrameStack:
         return stacked_vector
 
     def step(self, action, goal_angle):
+        valve_angle_prev  = self.env.get_valve_angle() # get the value previous take the action
+        #print("valve angle previous action:", valve_angle_prev)
+
         self.env.step_action(action)
         original_img = self.env.vision_config.get_camera_image()
         obs          = self.env.vision_config.pre_pro_image(original_img)
-        valve_angle  = self.env.get_valve_angle()
-        ext_reward, done, distance = self.env.calculate_extrinsic_reward(goal_angle, valve_angle)
+
+        valve_angle_aft  = self.env.get_valve_angle()
+        #print("valve angle after action:", valve_angle_aft)
+
+        ext_reward, done, distance = self.env.calculate_extrinsic_reward(goal_angle, valve_angle_prev, valve_angle_aft)
+
         self.frames_stacked.append(obs)
         stacked_images = np.array(list(self.frames_stacked))
-        return stacked_images, ext_reward, done, distance, original_img, valve_angle
+        return stacked_images, ext_reward, done, distance, original_img, valve_angle_aft

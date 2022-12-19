@@ -36,8 +36,8 @@ class QFunction(nn.Module):
             nn.Linear(obs_dim + action_dim, hidden_dim[0]),
             nn.ReLU(),
 
-            nn.Linear(hidden_dim[0], hidden_dim[1]),
-            nn.ReLU(),
+            #nn.Linear(hidden_dim[0], hidden_dim[1]),
+            #nn.ReLU(),
 
             nn.Linear(hidden_dim[1], hidden_dim[2]),
             nn.ReLU(),
@@ -160,7 +160,7 @@ class Actor_Normal(nn.Module):
 
         self.input_size  = obs_dim
         self.actions_dim = actions_dim
-        self.hidden_size = [128, 64, 32]
+        self.hidden_size = [256, 256]
         self.max_value   = max_value
 
         self.actor_net = nn.Sequential(
@@ -170,14 +170,8 @@ class Actor_Normal(nn.Module):
 
             nn.Linear(self.hidden_size[0], self.hidden_size[1]),
             nn.ReLU(),
-            nn.BatchNorm1d(self.hidden_size[1]),
 
-
-            nn.Linear(self.hidden_size[1], self.hidden_size[2]),
-            nn.ReLU(),
-            nn.BatchNorm1d(self.hidden_size[2]),
-
-            nn.Linear(self.hidden_size[2], self.actions_dim),
+            nn.Linear(self.hidden_size[1], self.actions_dim),
             nn.Tanh()
         )
 
@@ -185,6 +179,24 @@ class Actor_Normal(nn.Module):
         x = self.actor_net(state)
         return x * self.max_value
 
+#----------------------------------------------------------------
+class QFunction_Normal(nn.Module):
+    def __init__(self, obs_dim, action_dim, hidden_dim):
+        super().__init__()
+        self.trunk = nn.Sequential(
+
+            nn.Linear(obs_dim + action_dim, hidden_dim[0]),
+            nn.ReLU(),
+
+            nn.Linear(hidden_dim[0], hidden_dim[1]),
+            nn.ReLU(),
+
+            nn.Linear(hidden_dim[1], 1)
+        )
+
+    def forward(self, obs, action):
+        obs_action = torch.cat([obs, action], dim=1)
+        return self.trunk(obs_action)
 
 class Critic_Normal(nn.Module):
     def __init__(self, obs_dim, action_dim):
@@ -192,10 +204,10 @@ class Critic_Normal(nn.Module):
 
         self.input_size  = obs_dim
         self.actions_dim = action_dim
-        self.hidden_dim = [128, 64, 32]
+        self.hidden_dim  = [256, 256]
 
-        self.Q1 = QFunction(self.input_size, action_dim, self.hidden_dim)
-        self.Q2 = QFunction(self.input_size, action_dim, self.hidden_dim)
+        self.Q1 = QFunction_Normal(self.input_size, action_dim, self.hidden_dim)
+        self.Q2 = QFunction_Normal(self.input_size, action_dim, self.hidden_dim)
 
     def forward(self, state, action):
         q1 = self.Q1(state, action)

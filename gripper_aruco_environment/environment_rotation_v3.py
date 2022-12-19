@@ -72,7 +72,7 @@ class RL_ENV:
                 break
             else:
                 print("waiting for camera and marks")
-        return np.array(state_space_vector), raw_img
+        return np.array(state_space_vector), raw_img, self.cylinder_angle
 
 
     def env_step(self, actions):
@@ -93,7 +93,9 @@ class RL_ENV:
                                            id_4_dxl_goal_position)
 
     
-    def calculate_reward(self):
+    def calculate_reward(self, valve_before, valve_after):
+
+        '''
         cylinder_angle_single    = self.cylinder_angle[0]
         difference_cylinder_goal = np.abs(cylinder_angle_single - self.goal_angle)
 
@@ -106,6 +108,29 @@ class RL_ENV:
             reward_d = -difference_cylinder_goal
 
         return reward_d, done, difference_cylinder_goal
+        '''
+
+        # new reward function:
+        cylinder_angle_previous_action = valve_before[0]
+        cylinder_angle_after_action    = valve_after[0]
+
+        delta_changes = np.abs(self.goal_angle - cylinder_angle_previous_action) - np.abs(self.goal_angle - cylinder_angle_after_action)
+        if -5 <= delta_changes <= 5:
+            # noise or no changes
+            reward = 0
+        else:
+            reward = delta_changes
+
+        distance_cylinder_to_goal = np.abs(cylinder_angle_after_action - self.goal_angle)
+
+        if distance_cylinder_to_goal <= 5:
+            reward = reward + 100
+            done = True
+        else:
+            done = False
+
+        return reward, done, distance_cylinder_to_goal
+
 
 
     def env_render(self, image=None, done=False, step=1, episode=1, cylinder=0, mode="exploration"):

@@ -103,10 +103,18 @@ class Vision:
 
                 goal_angle = np.array([goal_angle])
 
+                '''
                 state_space = (joint_0_arm_1_location, joint_0_arm_2_location,
                                joint_1_arm_1_location, joint_1_arm_2_location,
                                end_arm_1_location, end_arm_2_location,
                                cylinder_location, cylinder_angle, goal_angle)
+                '''
+
+                #remove the location of the valve
+                state_space = (joint_0_arm_1_location, joint_0_arm_2_location,
+                               joint_1_arm_1_location, joint_1_arm_2_location,
+                               end_arm_1_location, end_arm_2_location,
+                               cylinder_angle, goal_angle)
 
                 self.vision_flag_status = True
                 return state_space, image, self.vision_flag_status
