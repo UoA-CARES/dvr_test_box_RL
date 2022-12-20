@@ -121,12 +121,12 @@ class Critic(nn.Module):
         super(Critic, self).__init__()
 
         self.encoder_net = Encoder(latent_dim)
-        self.hidden_dim  = [128, 64, 32]
+        self.hidden_dim  = [256, 256, 256]
 
         self.Q1 = QFunction(input_dim, action_dim, self.hidden_dim)
         self.Q2 = QFunction(input_dim, action_dim, self.hidden_dim)
 
-        self.apply(weight_init)
+        #self.apply(weight_init)
 
     def forward(self, state, action, goal_angle, target_on=True, detach_encoder=False):
         if target_on:
@@ -147,7 +147,7 @@ class Actor(nn.Module):
     def __init__(self, latent_dim, input_dim, action_dim):
         super(Actor, self).__init__()
         self.encoder_net = Encoder(latent_dim)
-        self.hidden_size = [128, 64, 32]
+        self.hidden_size = [256, 256, 256]
 
         self.act_net = nn.Sequential(
             nn.Linear(input_dim, self.hidden_size[0]),
@@ -159,12 +159,12 @@ class Actor(nn.Module):
 
             nn.Linear(self.hidden_size[1], self.hidden_size[2]),
             nn.ReLU(),
-            #nn.BatchNorm1d(self.hidden_size[2]),  # this is new from previous version
+            #nn.BatchNorm1d(self.hidden_size[2]),
 
             nn.Linear(self.hidden_size[2], action_dim),
             nn.Tanh()
         )
-        self.apply(weight_init)
+        #self.apply(weight_init)
 
     def forward(self, state, goal_angle, target_on=True, detach_encoder=False):
         if target_on:

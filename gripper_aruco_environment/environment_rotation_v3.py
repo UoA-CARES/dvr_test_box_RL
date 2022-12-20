@@ -123,7 +123,7 @@ class RL_ENV:
 
         distance_cylinder_to_goal = np.abs(cylinder_angle_after_action - self.goal_angle)
 
-        if distance_cylinder_to_goal <= 5:
+        if distance_cylinder_to_goal <= 3:
             reward = reward + 100
             done = True
         else:

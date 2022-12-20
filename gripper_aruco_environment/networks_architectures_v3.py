@@ -13,9 +13,11 @@ class QFunction(nn.Module):
 
             nn.Linear(hidden_dim[0], hidden_dim[1]),
             nn.ReLU(),
+            nn.BatchNorm1d(hidden_dim[1]),
 
             nn.Linear(hidden_dim[1], hidden_dim[2]),
             nn.ReLU(),
+            nn.BatchNorm1d(hidden_dim[2]),
 
             nn.Linear(hidden_dim[2], 1)
         )

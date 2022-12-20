@@ -258,6 +258,6 @@ class Motor:
             end_time = time.time()
             timer    = end_time - start_time
 
-            if timer >= 3.0:
+            if timer >= 2.0:
                 #print("time over, couldn't reach to the point. Moving to next action")
                 break

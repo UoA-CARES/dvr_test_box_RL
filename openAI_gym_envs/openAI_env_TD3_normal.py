@@ -44,8 +44,8 @@ class TD3Agent:
         self.policy_freq_update = 2
         self.max_memory_size    = memory_size
 
-        self.lr_critic  = 1e-3 #1e-3
-        self.lr_actor   = 1e-4 #1e-4
+        self.lr_critic  = 3e-4 #1e-3
+        self.lr_actor   = 3e-4 #1e-4
 
         # -------- Models --------------- #
         self.memory = Memory(self.max_memory_size, self.device)
@@ -95,6 +95,7 @@ class TD3Agent:
 
             self.critic_optimizer.zero_grad()
             critic_loss_total.backward()
+            torch.nn.utils.clip_grad_value_(self.critic.parameters(), clip_value=10.0) # still no sure about this
             self.critic_optimizer.step()
 
             if self.update_counter % self.policy_freq_update == 0:
@@ -107,10 +108,9 @@ class TD3Agent:
                 actor_q_min = torch.min(actor_q1, actor_q2)
                 actor_loss  = - actor_q_min.mean()
 
-
-
                 self.actor_optimizer.zero_grad()
                 actor_loss.backward()
+                torch.nn.utils.clip_grad_value_(self.actor.parameters(), clip_value=10.0)
                 self.actor_optimizer.step()
                 # ------------------------------------- Update target networks --------------- #
                 for target_param, param in zip(self.actor_target.parameters(), self.actor.parameters()):
@@ -207,8 +207,8 @@ def evaluation_function(agent, env):
 def main_run():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    env = gym.make('Pendulum-v1')
-    #env = gym.make("BipedalWalker-v3")
+    #env = gym.make('Pendulum-v1')
+    env = gym.make("BipedalWalker-v3")
 
     env_name         = env.unwrapped.spec.id
     max_action_value = env.action_space.high.max()
@@ -218,14 +218,14 @@ def main_run():
 
     if env_name == "Pendulum-v1":
         num_episodes_exploration = 100
-        num_episodes_training    = 1000
+        num_episodes_training    = 20
         episode_horizont         = 200
-        memory_size              = int(1e6) #40_000
+        memory_size              = 20_000
     else:
         num_episodes_exploration = 100
         num_episodes_training    = 1000
         episode_horizont         = 1600
-        memory_size              = int(1e6) #320_000
+        memory_size              = int(num_episodes_exploration*episode_horizont)
 
     env.seed(seed)
     env.action_space.seed(seed)

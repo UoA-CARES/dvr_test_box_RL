@@ -110,7 +110,7 @@ class ENV:
         else:
             reward_ext = delta_changes
 
-        if angle_difference <= 5:
+        if angle_difference <= 3:
             reward_ext = reward_ext + 100
             done = True
         else:

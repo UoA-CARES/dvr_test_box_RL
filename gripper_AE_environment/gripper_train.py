@@ -9,7 +9,7 @@ Description:
             image input size for NN  = 84 * 84
             latent vector size       = 50
 """
-
+import random
 import torch
 import numpy as np
 from tqdm import tqdm
@@ -28,9 +28,10 @@ def define_parse_args():
     parser.add_argument('--camera_index',          type=int,  default=2)
     parser.add_argument('--usb_index',             type=int,  default=0)
     parser.add_argument('--robot_index',           type=str,  default='robot-1')
-    parser.add_argument('--replay_max_size',       type=int,  default=20_000)
+    parser.add_argument('--replay_max_size',       type=int,  default=200_000)
 
-    parser.add_argument('--batch_size',               type=int,  default=32)
+    parser.add_argument('--seed',                     type=int, default=100)
+    parser.add_argument('--batch_size',               type=int,  default=256)
     parser.add_argument('--num_exploration_episodes', type=int,  default=1_000)
     parser.add_argument('--num_training_episodes',    type=int,  default=10_000)
     parser.add_argument('--episode_horizont',         type=int,  default=20)
@@ -41,7 +42,10 @@ def define_parse_args():
 def main_run():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     args   = define_parse_args()
-    # todo define a seed value here https://github.com/denisyarats/pytorch_sac_ae/blob/master/train.py#:~:text=utils.set_seed_everywhere(args.seed)
+
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
 
     env = ENV(
         camera_index=args.camera_index,
@@ -66,6 +70,7 @@ def main_run():
         k=args.k,
         env=env
     )
+
 
     initial_exploration(env, frame_stack, memory_buffer, args.num_exploration_episodes, args.episode_horizont)
     train_function(env, agent, frame_stack, memory_buffer, args.num_training_episodes, args.episode_horizont)
@@ -95,7 +100,7 @@ def train_function(env, agent, frames_stack, memory, num_training_episodes, epis
         distance_to_goal = 0
         for step in range(1, episode_horizont + 1):
             action = agent.select_action_from_policy(state_images, goal_angle)
-            noise  = np.random.normal(0, scale=0.1, size=4)
+            noise  = np.random.normal(0, scale=0.15, size=4)
             action = action + noise
             action = np.clip(action, -1, 1)
             new_state_images, reward, done, distance_to_goal, original_img, valve_angle = frames_stack.step(action, goal_angle)
@@ -103,10 +108,12 @@ def train_function(env, agent, frames_stack, memory, num_training_episodes, epis
             state_images = new_state_images
             episode_reward += reward
             env.render(original_img, step, episode, valve_angle, goal_angle, done)
+
+            agent.update_function()  # --> update function
+
             if done:
                 print("done ---> TRUE, breaking loop, end of this episode")
                 break
-            agent.update_function()  # --> update function
 
         episodes_total_reward.append(episode_reward)
         episodes_distance_to_goal.append(distance_to_goal)
