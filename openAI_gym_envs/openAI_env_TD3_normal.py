@@ -34,7 +34,6 @@ class TD3Agent:
         self.max_action_value = env.action_space.high.max()
         self.env_name         = env.unwrapped.spec.id
 
-        self.G = 10  # internal loop for Policy update
 
         self.gamma      = 0.99
         self.tau        = 0.005
@@ -44,8 +43,8 @@ class TD3Agent:
         self.policy_freq_update = 2
         self.max_memory_size    = memory_size
 
-        self.lr_critic  = 3e-4 #1e-3
-        self.lr_actor   = 3e-4 #1e-4
+        self.lr_critic  = 1e-3 #1e-3
+        self.lr_actor   = 1e-4 #1e-4
 
         # -------- Models --------------- #
         self.memory = Memory(self.max_memory_size, self.device)
@@ -95,7 +94,7 @@ class TD3Agent:
 
             self.critic_optimizer.zero_grad()
             critic_loss_total.backward()
-            torch.nn.utils.clip_grad_value_(self.critic.parameters(), clip_value=10.0) # still no sure about this
+            #torch.nn.utils.clip_grad_value_(self.critic.parameters(), clip_value=10.0) # still no sure about this
             self.critic_optimizer.step()
 
             if self.update_counter % self.policy_freq_update == 0:
@@ -110,7 +109,7 @@ class TD3Agent:
 
                 self.actor_optimizer.zero_grad()
                 actor_loss.backward()
-                torch.nn.utils.clip_grad_value_(self.actor.parameters(), clip_value=10.0)
+                #torch.nn.utils.clip_grad_value_(self.actor.parameters(), clip_value=10.0)
                 self.actor_optimizer.step()
                 # ------------------------------------- Update target networks --------------- #
                 for target_param, param in zip(self.actor_target.parameters(), self.actor.parameters()):
@@ -153,14 +152,14 @@ def run_training_rl_method(env, agent, max_value, num_episodes_training, episode
         state = env.reset()
         for step in range(1, episode_horizont + 1):
             action = agent.get_action_from_policy(state)
-            noise  = np.random.normal(0, scale=0.1*max_value, size=env.action_space.shape[0])
+            noise  = np.random.normal(0, scale=0.15*max_value, size=env.action_space.shape[0])
             action = action + noise
             action = np.clip(action, -max_value, max_value)
             new_state, reward, done, _ = env.step(action)
             agent.memory.save_experience_to_buffer(state, action, reward, new_state, done)
             state = new_state
             episode_reward += reward
-            for _ in range(1, 10):
+            for _ in range(1, 20):
                 agent.update_function()
             if done:
                 break
@@ -170,10 +169,12 @@ def run_training_rl_method(env, agent, max_value, num_episodes_training, episode
     agent.plot_functions(rewards)
 
 
-
 def run_exploration(env, agent,  num_exploration_episodes, episode_horizont):
     print("exploration start")
-    for _ in tqdm(range(1, num_exploration_episodes + 1)):
+    print("Filling Buffer....")
+    #for _ in tqdm(range(1, num_exploration_episodes + 1)):
+    while len(agent.memory.memory_buffer) < agent.memory.replay_max_size:
+        print(f"{len(agent.memory.memory_buffer)}/{agent.memory.replay_max_size}")
         state = env.reset()
         for step in range(1, episode_horizont):
             action = env.action_space.sample()
@@ -212,17 +213,17 @@ def main_run():
 
     env_name         = env.unwrapped.spec.id
     max_action_value = env.action_space.high.max()
-    batch_size = 256
-    seed       = 100
+    batch_size = 32
+    seed       = 0
 
 
     if env_name == "Pendulum-v1":
         num_episodes_exploration = 100
-        num_episodes_training    = 20
+        num_episodes_training    = 100
         episode_horizont         = 200
-        memory_size              = 20_000
+        memory_size              = int(num_episodes_exploration*episode_horizont)
     else:
-        num_episodes_exploration = 100
+        num_episodes_exploration = 200
         num_episodes_training    = 1000
         episode_horizont         = 1600
         memory_size              = int(num_episodes_exploration*episode_horizont)
@@ -233,9 +234,11 @@ def main_run():
     np.random.seed(seed)
 
     agent = TD3Agent(env, memory_size, device, batch_size)
+
     run_exploration(env, agent, num_episodes_exploration, episode_horizont)
     run_training_rl_method(env, agent, max_action_value, num_episodes_training, episode_horizont)
     evaluation_function(agent, env)
+
     env.close()
 
 

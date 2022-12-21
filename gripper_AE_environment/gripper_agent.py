@@ -8,7 +8,7 @@ from gripper_architectures import Actor, Critic, Decoder
 
 
 class Td3Agent:
-    def __init__(self, env, robot_index, device, memory_buffer, include_goal_angle_on, batch_size):
+    def __init__(self, env, robot_index, device, memory_buffer, include_goal_angle_on, batch_size, G):
 
         # ---------------- parameters  -------------------------#
         self.env         = env
@@ -28,7 +28,7 @@ class Td3Agent:
         self.tau         = 0.005  # 0.005
         self.tau_encoder = 0.001  # 0.001
 
-        self.G                  = 10
+        self.G                  = G
         self.update_counter     = 0
         self.policy_freq_update = 2
         self.batch_size         = batch_size
@@ -116,6 +116,7 @@ class Td3Agent:
 
                 self.critic_optimizer.zero_grad()
                 critic_loss_total.backward()
+                torch.nn.utils.clip_grad_value_(self.critic.parameters(), clip_value=10)
                 self.critic_optimizer.step()
 
                 # %%%%%%%%%%% Update the actor and soft updates of targets networks %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -128,6 +129,7 @@ class Td3Agent:
 
                     self.actor_optimizer.zero_grad()
                     actor_loss.backward()
+                    torch.nn.utils.clip_grad_value_(self.actor.parameters(), clip_value=10)
                     self.actor_optimizer.step()
 
                     # ------------------------------------- Update target networks --------------- #

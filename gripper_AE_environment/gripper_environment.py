@@ -104,7 +104,7 @@ class ENV:
         delta_changes    = np.abs(target_angle - valve_angle_previous) - np.abs(target_angle - valve_angle_after)
         angle_difference = np.abs(target_angle - valve_angle_after)
 
-        if -5 <= delta_changes <= 5:
+        if -3 <= delta_changes <= 3:
             # noise or no changes
             reward_ext = 0
         else:

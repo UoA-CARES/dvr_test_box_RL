@@ -115,6 +115,7 @@ class TD3agent_rotation:
             # Critic step Update
             self.critic_optimizer.zero_grad()
             critic_loss_total.backward()
+            torch.nn.utils.clip_grad_value_(self.critic.parameters(), clip_value=10)
             self.critic_optimizer.step()
 
             if self.update_counter % self.policy_freq_update == 0:
@@ -127,6 +128,7 @@ class TD3agent_rotation:
 
                 self.actor_optimizer.zero_grad()
                 actor_loss.backward()
+                torch.nn.utils.clip_grad_value_(self.actor.parameters(), clip_value=10)
                 self.actor_optimizer.step()
 
                 # ------------------------------------- Update target networks --------------- #
@@ -164,9 +166,13 @@ class TD3agent_rotation:
         # plt.show()
 
 
-def run_exploration(env, episodes, horizont, agent):
+def run_exploration(env, num_exploration_experiences, horizont, agent):
     mode = "Exploration"
-    for episode in tqdm(range(1, episodes+1)):
+    episode = 0
+    #for episode in tqdm(range(1, episodes+1)):
+    while len(agent.memory.replay_buffer) < num_exploration_experiences:
+        print(f"{len(agent.memory.replay_buffer)}/{num_exploration_experiences}")
+        episode += 1
         env.reset_env()
         for step in range(1, horizont+1):
             state, _, valve_angel_before = env.state_space_function()
@@ -178,7 +184,7 @@ def run_exploration(env, episodes, horizont, agent):
             env.env_render(image=image_state, episode=episode, step=step, done=done, mode=mode, cylinder=next_state[-2:-1])
             if done:
                 break
-    print(f"******* -----{episodes} for exploration ended-----********* ")
+    print(f"******* -----for exploration ended-----********* ")
 
 
 
@@ -227,12 +233,13 @@ def define_parse_args():
     parser.add_argument('--camera_index',     type=int, default=0)
     parser.add_argument('--usb_index',        type=int, default=1)
     parser.add_argument('--robot_index',      type=str, default='robot-2')
-    parser.add_argument('--replay_max_size',  type=int, default=200_000)
+    parser.add_argument('--replay_max_size',  type=int, default=100_000)
 
     parser.add_argument('--seed',                     type=int, default=100)
-    parser.add_argument('--batch_size',               type=int, default=256)
-    parser.add_argument('--G',                        type=int, default=10)
-    parser.add_argument('--num_exploration_episodes', type=int, default=1_000)
+    parser.add_argument('--batch_size',               type=int, default=32)
+    parser.add_argument('--G',                        type=int, default=15)
+    #parser.add_argument('--num_exploration_episodes',   type=int, default=1_000)
+    parser.add_argument('--num_exploration_experiences', type=int, default=10_000)
     parser.add_argument('--num_training_episodes',    type=int, default=10_000)
     parser.add_argument('--episode_horizont',         type=int, default=20)
 
@@ -252,7 +259,7 @@ def main_run():
     np.random.seed(args.seed)
     random.seed(args.seed)
 
-    run_exploration(env, args.num_exploration_episodes, args.episode_horizont, agent)
+    run_exploration(env, args.num_exploration_experiences, args.episode_horizont, agent)
     run_training(env, args.num_training_episodes, args.episode_horizont, agent)
 
 

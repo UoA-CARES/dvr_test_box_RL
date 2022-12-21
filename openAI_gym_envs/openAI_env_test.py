@@ -29,7 +29,7 @@ print("Action Range:", "Min:",    env.action_space.low.min(), ", Max:", env.acti
 for e in range(20):
     env.reset()
     for t in range(10000):
-        env.render()
+        #env.render()
         action = env.action_space.sample()
         observation, reward, done, info, = env.step(action)
         if done:

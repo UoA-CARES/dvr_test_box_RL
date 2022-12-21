@@ -73,7 +73,6 @@ class FrameStack:
     def step(self, action, goal_angle):
         valve_angle_prev  = self.env.get_valve_angle() # get the value previous take the action
         #print("valve angle previous action:", valve_angle_prev)
-
         self.env.step_action(action)
         original_img = self.env.vision_config.get_camera_image()
         obs          = self.env.vision_config.pre_pro_image(original_img)

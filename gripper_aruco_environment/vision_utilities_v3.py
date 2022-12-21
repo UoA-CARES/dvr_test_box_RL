@@ -68,6 +68,8 @@ class Vision:
 
     def calculate_marker_pose(self, goal_angle):
         image = self.get_camera_image()
+        #image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
         (corners, IDs, rejected) = cv2.aruco.detectMarkers(image, self.arucoDict, parameters=self.arucoParams)
         cv2.aruco.drawDetectedMarkers(image, corners, borderColor=(0, 0, 255))
         rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(corners, self.markerSize, self.matrix, self.distortion)

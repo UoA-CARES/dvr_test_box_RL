@@ -28,11 +28,13 @@ def define_parse_args():
     parser.add_argument('--camera_index',          type=int,  default=2)
     parser.add_argument('--usb_index',             type=int,  default=0)
     parser.add_argument('--robot_index',           type=str,  default='robot-1')
-    parser.add_argument('--replay_max_size',       type=int,  default=200_000)
+    parser.add_argument('--replay_max_size',       type=int,  default=100_000)
 
     parser.add_argument('--seed',                     type=int, default=100)
-    parser.add_argument('--batch_size',               type=int,  default=256)
-    parser.add_argument('--num_exploration_episodes', type=int,  default=1_000)
+    parser.add_argument('--batch_size',               type=int,  default=32)
+    parser.add_argument('--G',                        type=int, default=15)
+    #parser.add_argument('--num_exploration_episodes', type=int,  default=1_000)
+    parser.add_argument('--num_exploration_experiences', type=int, default=10_000)
     parser.add_argument('--num_training_episodes',    type=int,  default=10_000)
     parser.add_argument('--episode_horizont',         type=int,  default=20)
 
@@ -63,7 +65,8 @@ def main_run():
         device=device,
         memory_buffer=memory_buffer,
         include_goal_angle_on=args.include_goal_angle_on,
-        batch_size=args.batch_size
+        batch_size=args.batch_size,
+        G=args.G
     )
 
     frame_stack = FrameStack(
@@ -72,12 +75,16 @@ def main_run():
     )
 
 
-    initial_exploration(env, frame_stack, memory_buffer, args.num_exploration_episodes, args.episode_horizont)
+    initial_exploration(env, frame_stack, memory_buffer, args.num_exploration_experiences, args.episode_horizont)
     train_function(env, agent, frame_stack, memory_buffer, args.num_training_episodes, args.episode_horizont)
 
-def initial_exploration(env, frames_stack, memory, num_exploration_episodes, episode_horizont):
+def initial_exploration(env, frames_stack, memory, num_exploration_experiences, episode_horizont):
     print("exploration start")
-    for episode in tqdm(range(1, num_exploration_episodes + 1)):
+    #for episode in tqdm(range(1, num_exploration_episodes + 1)):
+    episode = 0
+    while len(memory.memory_buffer) < num_exploration_experiences:
+        print(f"{len(memory.memory_buffer)}/{num_exploration_experiences}")
+        episode += 1
         state_images  = frames_stack.reset()
         goal_angle    = env.define_goal_angle()
         for step in range(1, episode_horizont + 1):
@@ -93,6 +100,7 @@ def initial_exploration(env, frames_stack, memory, num_exploration_episodes, epi
 def train_function(env, agent, frames_stack, memory, num_training_episodes, episode_horizont):
     episodes_total_reward     = []
     episodes_distance_to_goal = []
+
     for episode in range(1, num_training_episodes + 1):
         state_images   = frames_stack.reset()
         goal_angle     = env.define_goal_angle()

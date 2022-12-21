@@ -115,7 +115,7 @@ class RL_ENV:
         cylinder_angle_after_action    = valve_after[0]
 
         delta_changes = np.abs(self.goal_angle - cylinder_angle_previous_action) - np.abs(self.goal_angle - cylinder_angle_after_action)
-        if -5 <= delta_changes <= 5:
+        if -3 <= delta_changes <= 3:
             # noise or no changes
             reward = 0
         else:
@@ -141,7 +141,7 @@ class RL_ENV:
             color = (0, 0, 255)
 
         target_angle = self.goal_angle
-        cv2.circle(image, (560, 405), 97, color, 2)
+        cv2.circle(image, (570, 460), 97, color, 2)
 
         cv2.putText(image, f'Goal     Angle : {target_angle}', (580, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1, cv2.LINE_AA)
         cv2.putText(image, f'Cylinder Angle : {int(cylinder)}', (580, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1, cv2.LINE_AA)
@@ -151,18 +151,18 @@ class RL_ENV:
         cv2.putText(image, f'Stage : {mode}', (900, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1, cv2.LINE_AA)
 
         # plot target line
-        x_clock = int(560 + 97 * math.cos(np.deg2rad(target_angle-90)))
-        y_clock = int(405 + 97 * math.sin(np.deg2rad(target_angle-90)))
+        x_clock = int(570 + 97 * math.cos(np.deg2rad(target_angle-90)))
+        y_clock = int(460 + 97 * math.sin(np.deg2rad(target_angle-90)))
         interna_line_x = int(20 * math.cos(np.deg2rad(target_angle-90)))
         interna_line_y = int(20 * math.sin(np.deg2rad(target_angle-90)))
         cv2.line(image, (x_clock-interna_line_x, y_clock-interna_line_y), (x_clock+interna_line_x, y_clock+interna_line_y), (255, 0, 0), 2)
 
-        x_clock_cylinder = int(560 + 97 * math.cos(np.deg2rad(cylinder-90)))
-        y_clock_cylinder = int(405 + 97 * math.sin(np.deg2rad(cylinder-90)))
+        x_clock_cylinder = int(570 + 97 * math.cos(np.deg2rad(cylinder-90)))
+        y_clock_cylinder = int(460 + 97 * math.sin(np.deg2rad(cylinder-90)))
         interna_line_x_cylinder = int(20 * math.cos(np.deg2rad(cylinder-90)))
         interna_line_y_cylinder = int(20 * math.sin(np.deg2rad(cylinder-90)))
 
-        cv2.line(image, (560, 405), (x_clock_cylinder+interna_line_x_cylinder, y_clock_cylinder+interna_line_y_cylinder), color, 2)
+        cv2.line(image, (570, 460), (x_clock_cylinder+interna_line_x_cylinder, y_clock_cylinder+interna_line_y_cylinder), color, 2)
 
         cv2.imshow("State Image Rotation", image)
         cv2.waitKey(10)
