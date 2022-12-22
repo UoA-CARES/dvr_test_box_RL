@@ -144,7 +144,7 @@ class TD3Agent:
         print("plots have been saved...")
 
 
-def run_training_rl_method(env, agent, max_value, num_episodes_training, episode_horizont):
+def run_training_rl_method(env, agent, max_value, num_episodes_training, episode_horizont, G):
     rewards = []
     for episode in range(1, num_episodes_training + 1):
         print(f"-----------------Episode {episode}-----------------------------")
@@ -159,7 +159,7 @@ def run_training_rl_method(env, agent, max_value, num_episodes_training, episode
             agent.memory.save_experience_to_buffer(state, action, reward, new_state, done)
             state = new_state
             episode_reward += reward
-            for _ in range(1, 20):
+            for _ in range(1, G+1):
                 agent.update_function()
             if done:
                 break
@@ -208,14 +208,14 @@ def evaluation_function(agent, env):
 def main_run():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    #env = gym.make('Pendulum-v1')
-    env = gym.make("BipedalWalker-v3")
+    env = gym.make('Pendulum-v1')
+    #env = gym.make("BipedalWalker-v3")
 
     env_name         = env.unwrapped.spec.id
     max_action_value = env.action_space.high.max()
     batch_size = 32
     seed       = 0
-
+    G = 10
 
     if env_name == "Pendulum-v1":
         num_episodes_exploration = 100
@@ -236,7 +236,7 @@ def main_run():
     agent = TD3Agent(env, memory_size, device, batch_size)
 
     run_exploration(env, agent, num_episodes_exploration, episode_horizont)
-    run_training_rl_method(env, agent, max_action_value, num_episodes_training, episode_horizont)
+    run_training_rl_method(env, agent, max_action_value, num_episodes_training, episode_horizont, G)
     evaluation_function(agent, env)
 
     env.close()

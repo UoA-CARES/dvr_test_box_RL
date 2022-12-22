@@ -46,14 +46,14 @@ class RLAgent:
         self.critic_lr = 1e-3  # 1e-3
         self.actor_lr  = 1e-4  # 1e-4
 
-        self.tau         = 0.05 # 0.005
-        self.tau_encoder = 0.01 # 0.001
+        self.tau         = 0.005 # 0.005
+        self.tau_encoder = 0.001 # 0.001
         self.gamma       = 0.99
 
         self.update_counter     = 0
         self.policy_freq_update = 2
 
-        self.batch_size = batch_size  # 64
+        self.batch_size = batch_size  # 32
         self.latent_dim = 50  # 50
         self.action_dim = env.action_space.shape[0]
 
@@ -91,14 +91,12 @@ class RLAgent:
         self.decoder.train(True)
 
     def select_action_from_policy(self, state_image_pixel):
-        self.actor.eval()
         with torch.no_grad():
             state_image_tensor = torch.FloatTensor(state_image_pixel)
             state_image_tensor = state_image_tensor.unsqueeze(0).to(self.device)
             action = self.actor(state_image_tensor)
-            action = action.cpu().data.numpy()
-        self.actor.train(True)
-        return action[0]
+            action = action.cpu().data.numpy().flatten()
+        return action
 
     def update_function(self):
         if len(self.memory.memory_buffer) <= self.batch_size:
@@ -180,6 +178,12 @@ class RLAgent:
         torch.save(self.decoder.state_dict(), f'trained_models/AE-TD3_decoder_{self.env_name}.pht')
         print("models have been saved...")
 
+    def load_models(self):
+        self.actor.load_state_dict(torch.load(f'trained_models/AE-TD3_actor_{self.env_name}.pht'))
+        self.critic.encoder_net.load_state_dict(torch.load(f'trained_models/AE-TD3_encoder_{self.env_name}.pht'))
+        self.decoder.load_state_dict(torch.load(f'trained_models/AE-TD3_decoder_{self.env_name}.pht'))
+        print("models has been loaded...")
+
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 def plot_reward(reward_vector, env_name):
@@ -208,7 +212,9 @@ def plot_reconstructions(input_img, reconstruction_img, env_name):
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 def run_random_exploration(env, agent, frames_stack, num_exploration_episodes, episode_horizont):
     print("exploration start")
-    for _ in tqdm(range(1, num_exploration_episodes + 1)):
+    #for _ in tqdm(range(1, num_exploration_episodes + 1)):
+    while len(agent.memory.memory_buffer) < agent.memory.replay_max_size:
+        print(f"{len(agent.memory.memory_buffer)}/{agent.memory.replay_max_size}")
         state_image = frames_stack.reset()
         for step in range(1, episode_horizont + 1):
             action = env.action_space.sample()
@@ -234,9 +240,10 @@ def run_training_rl_method(env, agent, max_action_value, env_name, frames_stack,
             agent.memory.save_experience_to_buffer(state_image, action, reward, new_state_image, done)
             state_image = new_state_image
             episode_reward += reward
+            agent.update_function()
+
             if done:
                 break
-            agent.update_function()
 
         total_reward.append(episode_reward)
         print(f"Episode {episode} End, Total reward: {episode_reward}")
@@ -255,12 +262,31 @@ def autoencoder_evaluation(agent, frames_stack, env_name, device):
         rec_obs  = rec_obs.cpu().numpy()
     plot_reconstructions(state_image, rec_obs[0], env_name)
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+def policy_env_evaluation_function(agent, env, frames_stack):
+    agent.load_models()
+
+    episodes_test = 10
+    seed          = 200
+    env.seed(seed)
+
+    for episode in range(1, episodes_test + 1):
+        episode_reward = 0
+        state_image    = frames_stack.reset()
+        done = False
+        while not (done is True):
+            action = agent.select_action_from_policy(state_image)
+            new_state_image, reward, done, _ = frames_stack.step(action)
+            state_image = new_state_image
+            episode_reward += reward
+        print(episode_reward)
+
 
 def define_parse_args():
     parser = ArgumentParser()
     parser.add_argument('--k',          type=int, default=3)
     parser.add_argument('--G',          type=int, default=10)
-    parser.add_argument('--batch_size', type=int, default=100)
+    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--seed',       type=int, default=0)
     parser.add_argument('--env_name',   type=str, default='Pendulum-v1')  # BipedalWalker-v3
     args   = parser.parse_args()
     return args
@@ -270,9 +296,6 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     args   = define_parse_args()
 
-    # select the env
-    #env   = gym.make('Pendulum-v1') # --> single action
-    #env = gym.make("BipedalWalker-v3") --> four actions
     env      = gym.make(args.env_name)
     env_name = args.env_name
     max_action_value = env.action_space.high.max()  # --> 2 for pendulum, 1 for Walker
@@ -283,10 +306,15 @@ def main():
         episode_horizont         = 200
         memory_size              = 40_000
     else:
-        num_exploration_episodes = 200
+        num_exploration_episodes = 125
         num_training_episodes    = 1000
-        episode_horizont         = 200     # 1600
-        memory_size              = 40_000 # 320_000
+        episode_horizont         = 1600
+        memory_size              = 200_000 # 320_000
+
+    env.seed(args.seed)
+    env.action_space.seed(args.seed)
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
 
     agent        = RLAgent(env, memory_size, device, args.batch_size, args.G)
     frames_stack = FrameStack(args.k, env)

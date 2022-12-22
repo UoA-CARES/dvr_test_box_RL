@@ -8,7 +8,7 @@ class Actor(nn.Module):
         self.max_value   = max_value
         self.encoder_net = Encoder(latent_dim)
 
-        self.hidden_size = [32, 32, 32]
+        self.hidden_size = [1024, 1024, 1024]
         self.act_net = nn.Sequential(
 
             nn.Linear(latent_dim, self.hidden_size[0]),
@@ -16,7 +16,9 @@ class Actor(nn.Module):
 
             nn.Linear(self.hidden_size[0], self.hidden_size[1]),
             nn.ReLU(),
-            nn.BatchNorm1d(self.hidden_size[1], affine=False),
+
+            nn.Linear(self.hidden_size[1], self.hidden_size[2]),
+            nn.ReLU(),
 
             nn.Linear(self.hidden_size[2], action_dim),
             nn.Tanh()
@@ -36,8 +38,8 @@ class QFunction(nn.Module):
             nn.Linear(obs_dim + action_dim, hidden_dim[0]),
             nn.ReLU(),
 
-            #nn.Linear(hidden_dim[0], hidden_dim[1]),
-            #nn.ReLU(),
+            nn.Linear(hidden_dim[0], hidden_dim[1]),
+            nn.ReLU(),
 
             nn.Linear(hidden_dim[1], hidden_dim[2]),
             nn.ReLU(),
@@ -54,7 +56,7 @@ class Critic(nn.Module):
         super(Critic, self).__init__()
 
         self.encoder_net = Encoder(latent_dim)
-        self.hidden_dim  = [32, 32, 32]
+        self.hidden_dim  = [1024, 1024, 1024]
 
         self.Q1 = QFunction(latent_dim, action_dim, self.hidden_dim)
         self.Q2 = QFunction(latent_dim, action_dim, self.hidden_dim)
@@ -217,7 +219,7 @@ class Critic_Normal(nn.Module):
 
     def forward(self, state, action):
         q1 = self.Q1(state, action)
-        q2 = self.Q1(state, action)
+        q2 = self.Q2(state, action)
         return q1, q2
 
 
