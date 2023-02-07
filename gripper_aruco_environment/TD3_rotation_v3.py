@@ -115,7 +115,7 @@ class TD3agent_rotation:
             # Critic step Update
             self.critic_optimizer.zero_grad()
             critic_loss_total.backward()
-            torch.nn.utils.clip_grad_value_(self.critic.parameters(), clip_value=10)
+            #torch.nn.utils.clip_grad_value_(self.critic.parameters(), clip_value=10)
             self.critic_optimizer.step()
 
             if self.update_counter % self.policy_freq_update == 0:
@@ -128,7 +128,7 @@ class TD3agent_rotation:
 
                 self.actor_optimizer.zero_grad()
                 actor_loss.backward()
-                torch.nn.utils.clip_grad_value_(self.actor.parameters(), clip_value=10)
+                #torch.nn.utils.clip_grad_value_(self.actor.parameters(), clip_value=10)
                 self.actor_optimizer.step()
 
                 # ------------------------------------- Update target networks --------------- #
@@ -235,11 +235,11 @@ def define_parse_args():
     parser.add_argument('--robot_index',      type=str, default='robot-2')
     parser.add_argument('--replay_max_size',  type=int, default=100_000)
 
-    parser.add_argument('--seed',                     type=int, default=100)
+    parser.add_argument('--seed',                     type=int, default=0)
     parser.add_argument('--batch_size',               type=int, default=32)
-    parser.add_argument('--G',                        type=int, default=15)
+    parser.add_argument('--G',                        type=int, default=10)
     #parser.add_argument('--num_exploration_episodes',   type=int, default=1_000)
-    parser.add_argument('--num_exploration_experiences', type=int, default=10_000)
+    parser.add_argument('--num_exploration_experiences', type=int, default=50_000)
     parser.add_argument('--num_training_episodes',    type=int, default=10_000)
     parser.add_argument('--episode_horizont',         type=int, default=20)
 

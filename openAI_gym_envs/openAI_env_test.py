@@ -13,10 +13,10 @@ print('ale_py:', ale_py.__version__)  # ale_py: 0.7.1
 
 #env = gym.make('CartPole-v1')      # Discrete action space
 #env = gym.make('CarRacing-v0')     # Continuous action space, need -->pip3 install Box2D gym
-#env = gym.make('Pendulum-v1')      # Continuous action space
+env = gym.make('Pendulum-v1')      # Continuous action space
 #env = gym.make("LunarLander-v2")   # Discrete action space
 #env = gym.make("Breakout-v0")      # Discrete action space
-env = gym.make("BipedalWalker-v3")  # Continuous action space
+#env = gym.make("BipedalWalker-v3")  # Continuous action space
 
 
 print("---- Environment Basic Info:")

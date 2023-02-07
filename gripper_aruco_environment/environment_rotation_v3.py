@@ -58,7 +58,16 @@ class RL_ENV:
 
     def define_goal_angle(self):
         #self.goal_angle = random.randint(-180, 180)
-        self.goal_angle  = random.randint(0, 360)
+        #self.goal_angle  = random.randint(0, 360)
+        goal_index = random.randint(1, 4)
+        if goal_index == 1:
+            self.goal_angle = 45
+        elif goal_index == 2:
+            self.goal_angle = 125
+        elif goal_index == 3:
+            self.goal_angle = 205
+        elif goal_index == 4:
+            self.goal_angle = 285
         print("New Goal Angle Generated", self.goal_angle)
         #return self.goal_angle
 

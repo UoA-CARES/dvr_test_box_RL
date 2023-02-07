@@ -11,6 +11,7 @@ class Memory:
         self.replay_max_size = replay_max_size
         self.memory_buffer   = deque(maxlen=replay_max_size)
 
+
     def save_experience_to_buffer(self, state, action, reward, next_state, done):
         experience = (state, action, reward, next_state, done)
         self.memory_buffer.append(experience)

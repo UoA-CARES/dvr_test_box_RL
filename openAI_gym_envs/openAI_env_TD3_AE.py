@@ -5,13 +5,11 @@ however I removed or changed many part here. The original paper use SAC
 
 Every state is rendered and passed as input to the autoencoder, after preprocessing it
 
-original image 510 x510 x 3 -->  Pendulum
-              (400, 600, 3) -- > BipedalWalker
+original image 510 x 510 x 3 -->  Pendulum
+               400 x 600 x 3 -->  BipedalWalker
 
 Input for the encoder = 3 stacked frames, gray scalded, normalized and resized (84 , 84)
 The input is batch-size x 3 x 84 x 84, where the stacked number takes the place of the channel for covnet
-
-status = working
 
 keys= initial exploration is very important, the activation function in the decoder helps
 Status = Working
@@ -32,6 +30,7 @@ from openAI_architectures_utilities import Actor, Critic, Decoder
 
 class RLAgent:
     def __init__(self, env, memory_size, device, batch_size, G):
+
         # env info
         self.max_action_value = env.action_space.high.max()
         self.env_name         = env.unwrapped.spec.id
@@ -62,6 +61,7 @@ class RLAgent:
         # main networks
         self.actor  = Actor(self.latent_dim, self.action_dim, self.max_action_value).to(self.device)
         self.critic = Critic(self.latent_dim, self.action_dim).to(self.device)
+
         # target networks
         self.actor_target  = Actor(self.latent_dim, self.action_dim, self.max_action_value).to(self.device)
         self.critic_target = Critic(self.latent_dim, self.action_dim).to(self.device)
@@ -79,10 +79,19 @@ class RLAgent:
         self.decoder = Decoder(self.latent_dim).to(device)
 
         # Optimizer
+        '''
         self.encoder_optimizer = torch.optim.Adam(self.critic.encoder_net.parameters(), lr=self.encoder_lr)
         self.decoder_optimizer = torch.optim.Adam(self.decoder.parameters(), lr=self.decoder_lr, weight_decay=1e-7)
         self.actor_optimizer   = torch.optim.Adam(self.actor.parameters(), lr=self.actor_lr, betas=(0.9, 0.999))
         self.critic_optimizer  = torch.optim.Adam(self.critic.parameters(), lr=self.critic_lr, betas=(0.9, 0.999))
+        '''
+
+        # Optimizer with default values
+        self.encoder_optimizer = torch.optim.Adam(self.critic.encoder_net.parameters(), lr=self.encoder_lr)
+        self.decoder_optimizer = torch.optim.Adam(self.decoder.parameters(), lr=self.decoder_lr)
+        self.actor_optimizer   = torch.optim.Adam(self.actor.parameters(),   lr=self.actor_lr)
+        self.critic_optimizer  = torch.optim.Adam(self.critic.parameters(),  lr=self.critic_lr)
+
 
         self.actor.train(True)
         self.critic.train(True)
@@ -95,8 +104,8 @@ class RLAgent:
             state_image_tensor = torch.FloatTensor(state_image_pixel)
             state_image_tensor = state_image_tensor.unsqueeze(0).to(self.device)
             action = self.actor(state_image_tensor)
-            action = action.cpu().data.numpy().flatten()
-        return action
+            action = action.cpu().data.numpy()#.flatten()
+        return action[0]
 
     def update_function(self):
         if len(self.memory.memory_buffer) <= self.batch_size:
@@ -212,9 +221,9 @@ def plot_reconstructions(input_img, reconstruction_img, env_name):
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 def run_random_exploration(env, agent, frames_stack, num_exploration_episodes, episode_horizont):
     print("exploration start")
-    #for _ in tqdm(range(1, num_exploration_episodes + 1)):
-    while len(agent.memory.memory_buffer) < agent.memory.replay_max_size:
-        print(f"{len(agent.memory.memory_buffer)}/{agent.memory.replay_max_size}")
+    for _ in tqdm(range(1, num_exploration_episodes + 1)):
+    #while len(agent.memory.memory_buffer) < agent.memory.replay_max_size:
+        #print(f"{len(agent.memory.memory_buffer)}/{agent.memory.replay_max_size}")
         state_image = frames_stack.reset()
         for step in range(1, episode_horizont + 1):
             action = env.action_space.sample()
@@ -240,10 +249,12 @@ def run_training_rl_method(env, agent, max_action_value, env_name, frames_stack,
             agent.memory.save_experience_to_buffer(state_image, action, reward, new_state_image, done)
             state_image = new_state_image
             episode_reward += reward
+
             agent.update_function()
 
             if done:
                 break
+
 
         total_reward.append(episode_reward)
         print(f"Episode {episode} End, Total reward: {episode_reward}")
@@ -284,8 +295,8 @@ def policy_env_evaluation_function(agent, env, frames_stack):
 def define_parse_args():
     parser = ArgumentParser()
     parser.add_argument('--k',          type=int, default=3)
-    parser.add_argument('--G',          type=int, default=10)
-    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--G',          type=int, default=1)
+    parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--seed',       type=int, default=0)
     parser.add_argument('--env_name',   type=str, default='Pendulum-v1')  # BipedalWalker-v3
     args   = parser.parse_args()
@@ -301,10 +312,10 @@ def main():
     max_action_value = env.action_space.high.max()  # --> 2 for pendulum, 1 for Walker
 
     if env_name == "Pendulum-v1":
-        num_exploration_episodes = 200
-        num_training_episodes    = 100
+        num_exploration_episodes = 300
+        num_training_episodes    = 300
         episode_horizont         = 200
-        memory_size              = 40_000
+        memory_size              = int(num_exploration_episodes*episode_horizont)
     else:
         num_exploration_episodes = 125
         num_training_episodes    = 1000
@@ -322,6 +333,7 @@ def main():
     run_random_exploration(env, agent, frames_stack, num_exploration_episodes=num_exploration_episodes, episode_horizont=episode_horizont)
     run_training_rl_method(env, agent, max_action_value, env_name, frames_stack, num_episodes_training=num_training_episodes, episode_horizont=episode_horizont)
     autoencoder_evaluation(agent, frames_stack, env_name, device)
+    policy_env_evaluation_function(agent, env, frames_stack)
     env.close()
 
 

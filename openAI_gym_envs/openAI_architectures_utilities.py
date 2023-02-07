@@ -8,7 +8,7 @@ class Actor(nn.Module):
         self.max_value   = max_value
         self.encoder_net = Encoder(latent_dim)
 
-        self.hidden_size = [1024, 1024, 1024]
+        self.hidden_size = [1024, 1024]
         self.act_net = nn.Sequential(
 
             nn.Linear(latent_dim, self.hidden_size[0]),
@@ -17,10 +17,7 @@ class Actor(nn.Module):
             nn.Linear(self.hidden_size[0], self.hidden_size[1]),
             nn.ReLU(),
 
-            nn.Linear(self.hidden_size[1], self.hidden_size[2]),
-            nn.ReLU(),
-
-            nn.Linear(self.hidden_size[2], action_dim),
+            nn.Linear(self.hidden_size[1], action_dim),
             nn.Tanh()
         )
         self.apply(weight_init)
@@ -41,10 +38,7 @@ class QFunction(nn.Module):
             nn.Linear(hidden_dim[0], hidden_dim[1]),
             nn.ReLU(),
 
-            nn.Linear(hidden_dim[1], hidden_dim[2]),
-            nn.ReLU(),
-
-            nn.Linear(hidden_dim[2], 1)
+            nn.Linear(hidden_dim[1], 1)
         )
 
     def forward(self, obs, action):
@@ -56,7 +50,7 @@ class Critic(nn.Module):
         super(Critic, self).__init__()
 
         self.encoder_net = Encoder(latent_dim)
-        self.hidden_dim  = [1024, 1024, 1024]
+        self.hidden_dim  = [1024, 1024]
 
         self.Q1 = QFunction(latent_dim, action_dim, self.hidden_dim)
         self.Q2 = QFunction(latent_dim, action_dim, self.hidden_dim)
@@ -154,6 +148,10 @@ def weight_init(m):
         nn.init.orthogonal_(m.weight.data[:, :, mid, mid], gain)
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
+
+
+
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # Networks for normal with a vector state space  TD3
 class Actor_Normal(nn.Module):
@@ -162,7 +160,7 @@ class Actor_Normal(nn.Module):
 
         self.input_size  = obs_dim
         self.actions_dim = actions_dim
-        self.hidden_size = [256, 256, 256]
+        self.hidden_size = [1024, 1024]
         self.max_value   = max_value
 
         self.actor_net = nn.Sequential(
@@ -173,10 +171,7 @@ class Actor_Normal(nn.Module):
             nn.Linear(self.hidden_size[0], self.hidden_size[1]),
             nn.ReLU(),
 
-            nn.Linear(self.hidden_size[1], self.hidden_size[2]),
-            nn.ReLU(),
-
-            nn.Linear(self.hidden_size[2], self.actions_dim),
+            nn.Linear(self.hidden_size[1], self.actions_dim),
             nn.Tanh()
         )
 
@@ -196,10 +191,7 @@ class QFunction_Normal(nn.Module):
             nn.Linear(hidden_dim[0], hidden_dim[1]),
             nn.ReLU(),
 
-            nn.Linear(hidden_dim[1], hidden_dim[2]),
-            nn.ReLU(),
-
-            nn.Linear(hidden_dim[2], 1)
+            nn.Linear(hidden_dim[1], 1)
         )
 
     def forward(self, obs, action):
@@ -212,7 +204,7 @@ class Critic_Normal(nn.Module):
 
         self.input_size  = obs_dim
         self.actions_dim = action_dim
-        self.hidden_dim  = [256, 256, 256]
+        self.hidden_dim  = [1024, 1024]
 
         self.Q1 = QFunction_Normal(self.input_size, action_dim, self.hidden_dim)
         self.Q2 = QFunction_Normal(self.input_size, action_dim, self.hidden_dim)
