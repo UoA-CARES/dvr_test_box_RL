@@ -13,13 +13,9 @@ class QFunction(nn.Module):
 
             nn.Linear(hidden_dim[0], hidden_dim[1]),
             nn.ReLU(),
-            nn.BatchNorm1d(hidden_dim[1]),
+            #nn.BatchNorm1d(hidden_dim[1]),
 
-            nn.Linear(hidden_dim[1], hidden_dim[2]),
-            nn.ReLU(),
-            nn.BatchNorm1d(hidden_dim[2]),
-
-            nn.Linear(hidden_dim[2], 1)
+            nn.Linear(hidden_dim[1], 1)
         )
 
     def forward(self, obs, action):
@@ -37,24 +33,22 @@ class Critic(nn.Module):
         q1 = self.Q1(state, action)
         q2 = self.Q2(state, action)
         return q1, q2
+
+
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Actor(nn.Module):
     def __init__(self, input_size, hidden_size, action_dim):
         super(Actor, self).__init__()
-        self.act_net = nn.Sequential(
 
+        self.act_net = nn.Sequential(
             nn.Linear(input_size, hidden_size[0]),
             nn.ReLU(),
 
             nn.Linear(hidden_size[0], hidden_size[1]),
             nn.ReLU(),
-            nn.BatchNorm1d(hidden_size[1]),
+            #nn.BatchNorm1d(hidden_size[1]),
 
-            nn.Linear(hidden_size[1], hidden_size[2]),
-            nn.ReLU(),
-            nn.BatchNorm1d(hidden_size[2]),
-
-            nn.Linear(hidden_size[2], action_dim),
+            nn.Linear(hidden_size[1], action_dim),
             nn.Tanh()
         )
 

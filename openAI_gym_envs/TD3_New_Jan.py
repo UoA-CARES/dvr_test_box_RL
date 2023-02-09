@@ -35,7 +35,6 @@ def plot_functions(total_reward, env_name, style):
     plt.show()
 
 
-
 def define_parse_args():
     parser = ArgumentParser()
     parser.add_argument('--k',           type=int, default=3)
@@ -44,7 +43,7 @@ def define_parse_args():
     parser.add_argument('--seed',        type=int, default=0)
 
     parser.add_argument('--memory_size',           type=int, default=int(1e6))
-    parser.add_argument('--max_exploration_steps', type=int, default=int(50e3))
+    parser.add_argument('--max_exploration_steps', type=int, default=int(60e3))
     parser.add_argument('--max_training_steps',    type=int, default=int(1e6))
 
     parser.add_argument('--env_name',   type=str, default='Pendulum-v1')  # BipedalWalker-v3

@@ -69,7 +69,6 @@ class RL_ENV:
         elif goal_index == 4:
             self.goal_angle = 285
         print("New Goal Angle Generated", self.goal_angle)
-        #return self.goal_angle
 
 
     def state_space_function(self):
@@ -124,6 +123,7 @@ class RL_ENV:
         cylinder_angle_after_action    = valve_after[0]
 
         delta_changes = np.abs(self.goal_angle - cylinder_angle_previous_action) - np.abs(self.goal_angle - cylinder_angle_after_action)
+
         if -3 <= delta_changes <= 3:
             # noise or no changes
             reward = 0
