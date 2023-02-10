@@ -42,7 +42,7 @@ class Gripper(object):
         self.baudrate = baudrate
         self.protocol = protocol  # NOTE: XL-320 uses protocol 2
 
-        self.port_handler = dxl.PortHandler(self.device_name)
+        self.port_handler   = dxl.PortHandler(self.device_name)
         self.packet_handler = dxl.PacketHandler(self.protocol)
         self.setup_handlers()
 
@@ -59,6 +59,7 @@ class Gripper(object):
         try:
             for i in range(0, self.num_motors):
                 self.servos[i] = Servo(self.port_handler, self.packet_handler, leds[i], i + 1, torque_limit, speed_limit, max[i], min[i])
+            self.setup_servos()
         except DynamixelServoError as error:
             raise DynamixelServoError(f"Gripper#{self.gripper_id}: Failed to initialise servos") from error
 
@@ -79,7 +80,7 @@ class Gripper(object):
         logging.info(f"Succeeded to change the baudrate to {self.baudrate}")
 
     @backoff.on_exception(backoff.expo, DynamixelServoError, jitter=None, giveup=handle_gripper_error)
-    def enable(self):
+    def setup_servos(self):
         try:
             for _, servo in self.servos.items():
                 servo.disable_torque()
@@ -198,8 +199,6 @@ class Gripper(object):
             #steps[i] = steps[i] * (max - min) + min
             steps[i] = int((steps[i] - min_action) * (max - min) / (max_action - min_action)  + min)
         return steps
-
-
 
     def close(self):
         # disable torque
