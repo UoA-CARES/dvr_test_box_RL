@@ -50,6 +50,7 @@ class TD3:
         self.update_counter += 1  # this is used for delay update the actor
         states, actions, rewards, next_states, dones = memory_buffer.sample_experiences_from_buffer(batch_size)
 
+
         with torch.no_grad():
             next_actions = self.actor_target(next_states)
             target_noise = 0.2 * torch.randn_like(next_actions)
@@ -62,14 +63,18 @@ class TD3:
 
             q_target = rewards + (self.gamma * (1 - dones) * q_min)
 
+
         q_vals_q1, q_vals_q2 = self.critic(states, actions)
 
         critic_loss_1 = F.mse_loss(q_vals_q1, q_target)
         critic_loss_2 = F.mse_loss(q_vals_q2, q_target)
         critic_loss_total = critic_loss_1 + critic_loss_2
 
+        print(critic_loss_total)
+
         self.critic_optimizer.zero_grad()
         critic_loss_total.backward()
+        torch.nn.utils.clip_grad_value_(self.critic.parameters(), clip_value=1.0)
         self.critic_optimizer.step()
 
         # Delayed policy updates
@@ -85,6 +90,7 @@ class TD3:
 
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
+            torch.nn.utils.clip_grad_value_(self.actor.parameters(), clip_value=1.0) # still no sure about this 0.1
             self.actor_optimizer.step()
             # ------------------------------------- Update target networks --------------- #
             for target_param, param in zip(self.actor_target.parameters(), self.actor.parameters()):
@@ -110,8 +116,8 @@ class TD3AE:
         self.encoder_lr = 1e-3
         self.decoder_lr = 1e-3
 
-        self.critic_lr = 3e-4  # 1e-3
-        self.actor_lr  = 3e-4  # 1e-4
+        self.critic_lr = 1e-3 #3e-4  # 1e-3
+        self.actor_lr  = 1e-4 #3e-4  # 1e-4
 
         self.tau         = 0.005 # 0.005
         self.tau_encoder = 0.001 # 0.001
@@ -167,6 +173,9 @@ class TD3AE:
 
         self.update_counter += 1  # this is used for delay update the actor
         states, actions, rewards, next_states, dones = memory_buffer.sample_experiences_from_buffer(batch_size)
+
+
+        #print(dones)
 
         with torch.no_grad():
             next_actions = self.actor_target(next_states)

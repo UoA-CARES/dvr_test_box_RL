@@ -23,8 +23,8 @@ class TD3:
 
         self.gamma      = 0.99
         self.tau        = 0.005
-        self.lr_critic  = 3e-4 #1e-3
-        self.lr_actor   = 3e-4 #1e-4
+        self.lr_critic  = 1e-4 # 3e-4 # 1e-3
+        self.lr_actor   = 1e-4 # 3e-4 # 1e-4
 
         self.update_counter     = 0
         self.policy_freq_update = 2
@@ -42,6 +42,8 @@ class TD3:
 
         self.actor.train(True)
         self.critic.train(True)
+        self.critic_target.train(True)
+        self.actor_target.train(True)
 
     def select_action(self, state):
         with torch.no_grad():
@@ -70,7 +72,8 @@ class TD3:
         actions     = torch.FloatTensor(np.asarray(actions)).to(self.device)
         rewards     = torch.FloatTensor(rewards).to(self.device)
         next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
-        dones       = torch.LongTensor(dones).to(self.device)
+        #dones       = torch.LongTensor(dones).to(self.device)
+        dones       = torch.FloatTensor(dones).to(self.device)
 
         # Reshape in the right order
         rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
@@ -86,7 +89,8 @@ class TD3:
             target_q_values_one, target_q_values_two = self.critic_target(next_states, next_actions)
             target_q_values = torch.min(target_q_values_one, target_q_values_two)
 
-            q_target = rewards + self.gamma * (1 - dones) * target_q_values
+            q_target = rewards + (self.gamma * (1 - dones) * target_q_values)
+
 
         q_vals_q1, q_vals_q2 = self.critic(states, actions)
 
@@ -94,9 +98,10 @@ class TD3:
         critic_loss_2     = F.mse_loss(q_vals_q2, q_target)
         critic_loss_total = critic_loss_1 + critic_loss_2
 
+
         self.critic_optimizer.zero_grad()
         critic_loss_total.backward()
-        torch.nn.utils.clip_grad_value_(self.critic.parameters(), clip_value=0.1) # still no  100% sure about this 0.1
+        torch.nn.utils.clip_grad_value_(self.critic.parameters(), clip_value=1.0) # still no  100% sure about this 0.1
         self.critic_optimizer.step()
 
         # Delayed policy updates
@@ -109,7 +114,7 @@ class TD3:
 
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
-            torch.nn.utils.clip_grad_value_(self.actor.parameters(), clip_value=0.1) # still no sure about this 0.1
+            torch.nn.utils.clip_grad_value_(self.actor.parameters(), clip_value=1.0) # still no sure about this 0.1
             self.actor_optimizer.step()
 
             # ------------------------------------- Update target networks --------------- #

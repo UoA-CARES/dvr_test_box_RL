@@ -38,13 +38,16 @@ class GripperEnvironment:
         else:
             marker_coordinates_all = self.find_joint_coordinates(marker_pose_all)
 
-        state = self.define_state_space(current_servo_positions, marker_coordinates_all, object_marker_yaw)
         self.target_angle = self.choose_target_angle()
         logging.info(f"New Goal Angle Generated : {self.target_angle}")
+
+        state = self.define_state_space(current_servo_positions, marker_coordinates_all, object_marker_yaw)
+
         return state
 
 
     def choose_target_angle(self):
+        """
         target_angle = np.random.randint(1, 5)
         if target_angle == 1:
             return 90
@@ -54,7 +57,8 @@ class GripperEnvironment:
             return 270
         elif target_angle == 4:
             return 0
-
+        """
+        return np.random.randint(low=0, high=360)
 
     def reward_function(self, target_angle, start_marker_pose, final_marker_pose):
         done = False
@@ -72,7 +76,7 @@ class GripperEnvironment:
 
         if angle_difference <= noise_tolerance:
             reward = reward + 100
-            logging.debug("Reached the Goal Angle!")
+            logging.info("--------------------Reached the Goal Angle!-----------------")
             done = True
 
         return reward, done
@@ -92,7 +96,6 @@ class GripperEnvironment:
                 # this check if all the seven marker are detected and return all the poses and double check for false detections
                 if all(ids in marker_poses for ids in marker_ids_vector) and len(marker_poses) == len(marker_ids_vector):
                     break
-
         return marker_poses
 
     def find_joint_coordinates(self, markers_pose):
@@ -105,11 +108,11 @@ class GripperEnvironment:
         return markers_xy_coordinates
 
     def define_state_space(self, servos_position, marker_coordinates, object_marker_yaw):
-        #todo include Goal angle in the state_space_vector
 
         state_space_vector = []
         if self.train_mode == 'servos':
             servos_position.append(object_marker_yaw)
+            #servos_position.append(self.target_angle)
             state_space_vector = servos_position
 
         elif self.train_mode == 'aruco_servos':
@@ -117,28 +120,30 @@ class GripperEnvironment:
             coordinate_vector.append(object_marker_yaw)
             for i in servos_position:
                 coordinate_vector.append(i)
+            #coordinate_vector.append(self.target_angle)
             state_space_vector = coordinate_vector
 
         elif self.train_mode == 'aruco':
             coordinate_vector = [element for state_space_list in marker_coordinates for element in state_space_list]
             coordinate_vector.append(object_marker_yaw)
+            #coordinate_vector.append(self.target_angle)
             state_space_vector = coordinate_vector
         return state_space_vector
 
     def step(self, action):
-        start_marker_pose_all        = self.find_marker_pose(marker_ids_vector=self.marker_ids_vector)
-        start_object_marker_yaw      = start_marker_pose_all[self.object_marker_id][1][2]
+        start_marker_pose_all    = self.find_marker_pose(marker_ids_vector=self.marker_ids_vector)
+        start_object_marker_yaw  = start_marker_pose_all[self.object_marker_id][1][2]
 
         try:
-            action = self.gripper.action_to_steps(action)
-            current_servo_positions = self.gripper.move(steps=action)
+            action_in_steps = self.gripper.action_to_steps(action)
+            current_servo_positions = self.gripper.move(steps=action_in_steps)
         except GripperError as error:
             # handle what to do if the gripper is unrecoverably gone wrong - i.e. save data and fail gracefully
             logging.error(error)
             exit()
 
-        final_marker_pose_all        = self.find_marker_pose(marker_ids_vector=self.marker_ids_vector)
-        final_object_marker_yaw      = final_marker_pose_all[self.object_marker_id][1][2]
+        final_marker_pose_all    = self.find_marker_pose(marker_ids_vector=self.marker_ids_vector)
+        final_object_marker_yaw  = final_marker_pose_all[self.object_marker_id][1][2]
 
         if self.train_mode == 'servos':
             final_marker_coordinates_all = None

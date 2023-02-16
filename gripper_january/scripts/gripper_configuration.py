@@ -143,7 +143,7 @@ class Gripper(object):
 
 
     @backoff.on_exception(backoff.expo, DynamixelServoError, jitter=None, giveup=handle_gripper_error)
-    def move(self, steps, wait=True, timeout=5):
+    def move(self, steps, wait=True, timeout=3):
         if not self.verify_steps(steps):
             error_message = f"Gripper#{self.gripper_id}: The move command provided is out of bounds: Step {steps}"
             logging.error(error_message)

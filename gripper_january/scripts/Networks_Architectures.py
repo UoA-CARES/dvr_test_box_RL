@@ -16,9 +16,13 @@ class Actor_Normal(nn.Module):
 
         self.actor_net = nn.Sequential(
             nn.Linear(self.input_size, self.hidden_size[0]),
+            nn.LayerNorm([self.hidden_size[0]]),
             nn.ReLU(),
+
             nn.Linear(self.hidden_size[0], self.hidden_size[1]),
+            nn.LayerNorm([self.hidden_size[1]]),
             nn.ReLU(),
+
             nn.Linear(self.hidden_size[1], self.actions_dim),
             nn.Tanh()
         )
@@ -34,10 +38,16 @@ class QFunction_Normal(nn.Module):
         super().__init__()
 
         self.trunk = nn.Sequential(
+
+
             nn.Linear(obs_dim + action_dim, hidden_dim[0]),
+            nn.LayerNorm([hidden_dim[0]]),
             nn.ReLU(),
+
             nn.Linear(hidden_dim[0], hidden_dim[1]),
+            nn.LayerNorm([hidden_dim[1]]),
             nn.ReLU(),
+
             nn.Linear(hidden_dim[1], 1)
         )
 

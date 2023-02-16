@@ -26,8 +26,13 @@ def set_seeds(seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
-def plot_reward_curves(historical_reward):
-    print(historical_reward)
+
+def normalise_state(state):
+    state_norm = [(element - np.mean(state)) / np.std(state) for element in state]
+    return state_norm
+
+
+
 
 def train(args, agent, memory, env, act_dim, file_name, plt):
     total_step_counter = 0
@@ -36,14 +41,14 @@ def train(args, agent, memory, env, act_dim, file_name, plt):
     historical_reward["reward"]  = []
 
     for episode in range(0, args.train_episode_num):
-
         state = env.reset()
-        #normalised_state = normalise_state(state)  # TODO normalize this state
+        state = normalise_state(state)
         episode_reward = 0
         step           = 0
         done           = False
 
         for step in range(0, args.episode_horizont):
+
             logging.info(f"Taking step {step+1}/{args.episode_horizont}")
             total_step_counter += 1
 
@@ -52,20 +57,26 @@ def train(args, agent, memory, env, act_dim, file_name, plt):
                 action = agent.action_sample()
             else:
                 action = agent.select_action(state)
-                noise  = np.random.normal(0, scale=0.1, size=act_dim)
+                noise  = np.random.normal(0, scale=0.15, size=act_dim)
+                print("Pure action:", action)
                 action = action + noise
                 action = np.clip(action, -1, 1)
-                action = action.astype(int)
+                #action = action.astype(int) # this makes all the action zero o one, problem
+                action = action.tolist()
+
+            print("Action:", action)
 
             next_state, reward, done, truncated = env.step(action)
             memory.add(state, action, reward, next_state, done)
             state = next_state
+            state = normalise_state(state)
+
             episode_reward += reward
 
             if len(memory.buffer) >= args.max_exploration_steps: # todo add also batch_size check
                 logging.info("Training Network")
-                experiences = memory.sample(args.batch_size)
                 for _ in range(0, args.G):
+                    experiences = memory.sample(args.batch_size)
                     agent.learn(experiences)
             if done:
                 break
@@ -84,14 +95,14 @@ def train(args, agent, memory, env, act_dim, file_name, plt):
 def parse_args():
     parser = ArgumentParser()
 
-    parser.add_argument("--G",               type=int,  default=1)
-    parser.add_argument("--seed",            type=int,  default=48)
-    parser.add_argument("--batch_size",      type=int,  default=10) #  100
-    parser.add_argument("--buffer_capacity", type=int,  default=1_000_000)
+    parser.add_argument("--G",               type=int,  default=5)
+    parser.add_argument("--seed",            type=int,  default=777)
+    parser.add_argument("--batch_size",      type=int,  default=128) # 256
+    parser.add_argument("--buffer_capacity", type=int,  default=500_000)
 
-    parser.add_argument("--train_episode_num",      type=int, default=20)  # 1000
-    parser.add_argument("--episode_horizont",       type=int, default=5)    # 50
-    parser.add_argument("--max_exploration_steps",  type=int, default=50)  # 3k - 5k
+    parser.add_argument("--train_episode_num",      type=int, default=5_000)  # 1000 Episodes
+    parser.add_argument("--episode_horizont",       type=int, default=50)      # 50
+    parser.add_argument("--max_exploration_steps",  type=int, default=3000)  # 3k - 5k Steps
 
     parser.add_argument('--train_mode', type=str, default='aruco')  # aruco, servos, aruco_servos
     parser.add_argument('--usb_port',   type=str, default='/dev/ttyUSB1') # '/dev/ttyUSB1', '/dev/ttyUSB0'
@@ -121,7 +132,7 @@ def main():
         logging.info("Training Using Servo positions and Object's Yaw angle")
         obs_dim = 5
     elif args.train_mode == 'aruco_servos':
-        logging.info("Training Using Aruco markers coord plus Servo positions and Object's Yaw angle")
+        logging.info("Training Using Aruco markers coord, Servo positions, and Object's Yaw angle")
         obs_dim = 19
     else:
         logging.info("Please select a correct train mode")

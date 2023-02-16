@@ -38,16 +38,16 @@ def plot_functions(total_reward, env_name, style):
 def define_parse_args():
     parser = ArgumentParser()
     parser.add_argument('--k',           type=int, default=3)
-    parser.add_argument('--G',           type=int, default=1)
-    parser.add_argument('--batch_size',  type=int, default=128)
+    parser.add_argument('--G',           type=int, default=5)
+    parser.add_argument('--batch_size',  type=int, default=256) #256
     parser.add_argument('--seed',        type=int, default=0)
 
     parser.add_argument('--memory_size',           type=int, default=int(1e6))
     parser.add_argument('--max_exploration_steps', type=int, default=int(60e3))
     parser.add_argument('--max_training_steps',    type=int, default=int(1e6))
 
-    parser.add_argument('--env_name',   type=str, default='Pendulum-v1')  # BipedalWalker-v3
-    parser.add_argument('--train_mode', type=str, default='autoencoder')  # normal
+    parser.add_argument('--env_name',   type=str, default='BipedalWalker-v3')  # BipedalWalker-v3, Pendulum-v1
+    parser.add_argument('--train_mode', type=str, default='normal')  # normal, autoencoder
     args   = parser.parse_args()
     return args
 
@@ -85,6 +85,7 @@ def main():
         episode_time_steps += 1
 
         if t < args.max_exploration_steps:
+            print(f"exploration steps:{t}/{args.max_exploration_steps}")
             action = env.action_space.sample()
         else:
             action = agent.get_action_from_policy(state)
@@ -104,6 +105,7 @@ def main():
         if t >= args.max_exploration_steps:
             for _ in range(1, args.G + 1):
                 agent.update_policy(memory_buffer, args.batch_size)
+
         if done:
             print(f"Total Steps: {t + 1}/{args.max_training_steps},  Episode Num: {episode_num + 1}, Steps per Episode: {episode_time_steps}, Reward: {episode_reward:.3f}")
             total_rewards.append(episode_reward)
@@ -121,7 +123,6 @@ def main():
 
     agent.save_models()
     plot_functions(total_rewards, env_name, args.train_mode)
-
 
 
 
