@@ -12,7 +12,7 @@ class Actor_Normal(nn.Module):
         self.actions_dim = actions_dim
         self.max_action  = max_action
 
-        self.hidden_size = [1024, 1024]
+        self.hidden_size = [256, 256]
 
         self.actor_net = nn.Sequential(
             nn.Linear(self.input_size, self.hidden_size[0]),
@@ -24,12 +24,14 @@ class Actor_Normal(nn.Module):
             nn.ReLU(),
 
             nn.Linear(self.hidden_size[1], self.actions_dim),
-            nn.Tanh()
+            #nn.Tanh()
         )
 
     def forward(self, state):
-        x = self.actor_net(state)
-        return x * self.max_action
+        pre_activation        = self.actor_net(state) # pre_activation value
+        pre_activation_scaled = pre_activation * 0.7  # 0.7 is a scaling factor choose empirically
+        output                = torch.tanh(pre_activation_scaled) * self.max_action
+        return pre_activation, output
 
 
 #----------------------------------------------------------------
@@ -38,7 +40,6 @@ class QFunction_Normal(nn.Module):
         super().__init__()
 
         self.trunk = nn.Sequential(
-
 
             nn.Linear(obs_dim + action_dim, hidden_dim[0]),
             nn.LayerNorm([hidden_dim[0]]),
@@ -61,7 +62,7 @@ class Critic_Normal(nn.Module):
 
         self.input_size = obs_dim
         self.action_dim = action_dim
-        self.hidden_dim = [1024, 1024]
+        self.hidden_dim = [256, 256]
 
         self.Q1 = QFunction_Normal(self.input_size, self.action_dim, self.hidden_dim)
         self.Q2 = QFunction_Normal(self.input_size, self.action_dim, self.hidden_dim)

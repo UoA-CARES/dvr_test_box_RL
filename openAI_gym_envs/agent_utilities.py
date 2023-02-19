@@ -42,7 +42,7 @@ class TD3:
             state_tensor = torch.FloatTensor(state)
             state_tensor = state_tensor.unsqueeze(0)
             state_tensor = state_tensor.to(self.device)
-            action = self.actor(state_tensor)
+            _, action = self.actor(state_tensor)
             action = action.cpu().data.numpy().flatten()
         return action
 
@@ -52,17 +52,16 @@ class TD3:
 
 
         with torch.no_grad():
-            next_actions = self.actor_target(next_states)
+            _, next_actions = self.actor_target(next_states)
             target_noise = 0.2 * torch.randn_like(next_actions)
             target_noise = target_noise.clamp(-0.5, 0.5)
             next_actions = next_actions + target_noise
             next_actions = next_actions.clamp(-self.max_act_value, self.max_act_value)
 
+
             next_q_values_q1, next_q_values_q2 = self.critic_target(next_states, next_actions)
             q_min = torch.min(next_q_values_q1, next_q_values_q2)
-
             q_target = rewards + (self.gamma * (1 - dones) * q_min)
-
 
         q_vals_q1, q_vals_q2 = self.critic(states, actions)
 
@@ -70,7 +69,6 @@ class TD3:
         critic_loss_2 = F.mse_loss(q_vals_q2, q_target)
         critic_loss_total = critic_loss_1 + critic_loss_2
 
-        print(critic_loss_total)
 
         self.critic_optimizer.zero_grad()
         critic_loss_total.backward()
@@ -80,7 +78,8 @@ class TD3:
         # Delayed policy updates
         if self.update_counter % self.policy_freq_update == 0:
             # ------- calculate the actor loss
-            actor_q1, actor_q2 = self.critic(states, self.actor(states))
+            pre_activation, action_actor = self.actor(states)
+            actor_q1, actor_q2 = self.critic(states, action_actor)
 
             # original paper work here with Q1 only
             # actor_loss = - actor_q1.mean()
@@ -88,8 +87,17 @@ class TD3:
             actor_q_min = torch.min(actor_q1, actor_q2)
             actor_loss = - actor_q_min.mean()
 
+            # idea: Saturation Penalty
+            upper_saturation  = torch.tensor(2.5)
+            lower_saturation  = torch.tensor(-2.5)
+            saturation_penalty = torch.max((pre_activation-upper_saturation), torch.tensor(0)) + torch.max((-pre_activation+lower_saturation), torch.tensor(0))
+            saturation_penalty = torch.square(saturation_penalty).mean()
+
+            total_actor_loss = actor_loss + (0.3 * saturation_penalty)
+
             self.actor_optimizer.zero_grad()
-            actor_loss.backward()
+            #actor_loss.backward()
+            total_actor_loss.backward()
             torch.nn.utils.clip_grad_value_(self.actor.parameters(), clip_value=1.0) # still no sure about this 0.1
             self.actor_optimizer.step()
             # ------------------------------------- Update target networks --------------- #

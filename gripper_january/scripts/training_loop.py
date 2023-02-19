@@ -33,7 +33,6 @@ def normalise_state(state):
 
 
 
-
 def train(args, agent, memory, env, act_dim, file_name, plt):
     total_step_counter = 0
     historical_reward  = {}
@@ -48,7 +47,6 @@ def train(args, agent, memory, env, act_dim, file_name, plt):
         done           = False
 
         for step in range(0, args.episode_horizont):
-
             logging.info(f"Taking step {step+1}/{args.episode_horizont}")
             total_step_counter += 1
 
@@ -57,7 +55,7 @@ def train(args, agent, memory, env, act_dim, file_name, plt):
                 action = agent.action_sample()
             else:
                 action = agent.select_action(state)
-                noise  = np.random.normal(0, scale=0.15, size=act_dim)
+                noise  = np.random.normal(0, scale=0.1, size=act_dim)
                 print("Pure action:", action)
                 action = action + noise
                 action = np.clip(action, -1, 1)
@@ -102,7 +100,7 @@ def parse_args():
 
     parser.add_argument("--train_episode_num",      type=int, default=5_000)  # 1000 Episodes
     parser.add_argument("--episode_horizont",       type=int, default=50)      # 50
-    parser.add_argument("--max_exploration_steps",  type=int, default=3000)  # 3k - 5k Steps
+    parser.add_argument("--max_exploration_steps",  type=int, default=2000)  # 3k - 5k Steps
 
     parser.add_argument('--train_mode', type=str, default='aruco')  # aruco, servos, aruco_servos
     parser.add_argument('--usb_port',   type=str, default='/dev/ttyUSB1') # '/dev/ttyUSB1', '/dev/ttyUSB0'

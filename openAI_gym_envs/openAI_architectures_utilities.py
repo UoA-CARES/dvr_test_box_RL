@@ -174,12 +174,14 @@ class Actor_Normal(nn.Module):
             nn.ReLU(),
 
             nn.Linear(self.hidden_size[1], self.actions_dim),
-            nn.Tanh()
+            #nn.Tanh()
         )
 
     def forward(self, state):
-        x = self.actor_net(state)
-        return x * self.max_value
+        pre_activation = self.actor_net(state) # pre_activation value
+        output         = torch.tanh(pre_activation) * self.max_value
+        #return output * self.max_value
+        return pre_activation, output
 
 #----------------------------------------------------------------
 class QFunction_Normal(nn.Module):
