@@ -53,8 +53,8 @@ class Gripper(object):
         self.num_motors = num_motors
 
         leds = [1, 2, 3, 4]
-        min = [300, 300, 300, 300]
-        max = [700, 700, 700, 700]
+        min  = [300, 300, 300, 300]
+        max  = [700, 700, 700, 700]
 
         try:
             for i in range(0, self.num_motors):
@@ -198,6 +198,8 @@ class Gripper(object):
             min = self.servos[i].min
             #steps[i] = steps[i] * (max - min) + min
             steps[i] = int((steps[i] - min_action) * (max - min) / (max_action - min_action)  + min)
+
+        print("Steps: ", steps)
         return steps
 
     def close(self):

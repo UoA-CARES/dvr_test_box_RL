@@ -1,5 +1,7 @@
 
 import copy
+
+import pandas as pd
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
@@ -9,17 +11,18 @@ from openAI_architectures_utilities  import Actor_Normal, Critic_Normal, Actor, 
 
 class TD3:
     def __init__(self, obs_dim, act_dim, max_act_value, device, env_name):
+
         self.obs_dim       = obs_dim
         self.act_dim       = act_dim
         self.max_act_value = max_act_value
         self.device        = device
         self.env_name      = env_name
 
-        self.lr_critic  = 3e-4 #1e-3
-        self.lr_actor   = 3e-4 #1e-4
+        self.lr_critic  = 1e-3 #3e-4 #1e-3
+        self.lr_actor   = 1e-3 #3e-4 #1e-4
 
         self.gamma = 0.99
-        self.tau   = 0.005
+        self.tau   = 0.005 # 0.005
 
         self.update_counter     = 0
         self.policy_freq_update = 2
@@ -36,6 +39,11 @@ class TD3:
         self.actor.train(True)
         self.critic.train(True)
 
+        self.critic_one_loss_data   = []
+        self.critic_two_loss_data   = []
+        self.critic_loss_total_data = []
+        self.actor_loss_data        = []
+
 
     def get_action_from_policy(self, state):
         with torch.no_grad():
@@ -48,8 +56,8 @@ class TD3:
 
     def update_policy(self, memory_buffer, batch_size):
         self.update_counter += 1  # this is used for delay update the actor
-        states, actions, rewards, next_states, dones = memory_buffer.sample_experiences_from_buffer(batch_size)
 
+        states, actions, rewards, next_states, dones = memory_buffer.sample_experiences_from_buffer(batch_size)
 
         with torch.no_grad():
             _, next_actions = self.actor_target(next_states)
@@ -58,10 +66,10 @@ class TD3:
             next_actions = next_actions + target_noise
             next_actions = next_actions.clamp(-self.max_act_value, self.max_act_value)
 
-
             next_q_values_q1, next_q_values_q2 = self.critic_target(next_states, next_actions)
-            q_min = torch.min(next_q_values_q1, next_q_values_q2)
-            q_target = rewards + (self.gamma * (1 - dones) * q_min)
+            q_min = torch.minimum(next_q_values_q1, next_q_values_q2)
+
+            q_target = rewards + self.gamma * (1 - dones) * q_min
 
         q_vals_q1, q_vals_q2 = self.critic(states, actions)
 
@@ -69,37 +77,58 @@ class TD3:
         critic_loss_2 = F.mse_loss(q_vals_q2, q_target)
         critic_loss_total = critic_loss_1 + critic_loss_2
 
-
         self.critic_optimizer.zero_grad()
         critic_loss_total.backward()
-        torch.nn.utils.clip_grad_value_(self.critic.parameters(), clip_value=1.0)
+        #torch.nn.utils.clip_grad_value_(self.critic.parameters(), clip_value=1.0)
+        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 1)
         self.critic_optimizer.step()
+
+        self.critic_one_loss_data.append(critic_loss_1.item())
+        self.critic_two_loss_data.append(critic_loss_2.item())
+        self.critic_loss_total_data.append(critic_loss_total.item())
 
         # Delayed policy updates
         if self.update_counter % self.policy_freq_update == 0:
-            # ------- calculate the actor loss
+            # ------- calculate the actor lossactor critic,
             pre_activation, action_actor = self.actor(states)
             actor_q1, actor_q2 = self.critic(states, action_actor)
 
             # original paper work here with Q1 only
             # actor_loss = - actor_q1.mean()
 
-            actor_q_min = torch.min(actor_q1, actor_q2)
-            actor_loss = - actor_q_min.mean()
+            actor_q_min = torch.minimum(actor_q1, actor_q2)
+            actor_loss  = - actor_q_min.mean()
 
             # idea: Saturation Penalty
-            upper_saturation  = torch.tensor(2.5)
-            lower_saturation  = torch.tensor(-2.5)
-            saturation_penalty = torch.max((pre_activation-upper_saturation), torch.tensor(0)) + torch.max((-pre_activation+lower_saturation), torch.tensor(0))
+            #upper_saturation  = torch.tensor(2.5)
+            #lower_saturation  = torch.tensor(-2.5)
+            #saturation_penalty = torch.max((pre_activation-upper_saturation), torch.tensor(0)) + torch.max((-pre_activation+lower_saturation), torch.tensor(0))
+            #saturation_penalty = torch.square(saturation_penalty).mean()
+
+            # idea: Saturation Penalty
+            #-------------------------------------------------------------------------------------
+            upper_saturation = 3.0
+            lower_saturation = -3.0
+            saturation_penalty_up = pre_activation - upper_saturation
+            saturation_penalty_up = torch.maximum(saturation_penalty_up, torch.tensor(0))
+
+            saturation_penalty_down = -pre_activation + lower_saturation
+            saturation_penalty_down = torch.maximum(saturation_penalty_down, torch.tensor(0))
+
+            saturation_penalty = saturation_penalty_up + saturation_penalty_down
             saturation_penalty = torch.square(saturation_penalty).mean()
 
-            total_actor_loss = actor_loss + (0.3 * saturation_penalty)
+            #-------------------------------------------------------------------------------------
+            total_actor_loss = actor_loss + (50 * saturation_penalty)
 
             self.actor_optimizer.zero_grad()
             #actor_loss.backward()
             total_actor_loss.backward()
-            torch.nn.utils.clip_grad_value_(self.actor.parameters(), clip_value=1.0) # still no sure about this 0.1
+            #torch.nn.utils.clip_grad_value_(self.actor.parameters(), clip_value=1.0) # still no sure about this 0.1
+            torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 1)
             self.actor_optimizer.step()
+
+            self.actor_loss_data.append(actor_loss.item())
             # ------------------------------------- Update target networks --------------- #
             for target_param, param in zip(self.actor_target.parameters(), self.actor.parameters()):
                 target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
@@ -111,6 +140,15 @@ class TD3:
         torch.save(self.actor.state_dict(), f'trained_models/Normal-TD3_actor_{self.env_name}.pht')
         print("models have been saved...")
 
+    def plot_loss(self):
+        data_dict_critic = {"Critic One": self.critic_one_loss_data, "Critic Two": self.critic_two_loss_data}
+        data_dict_actor  = {"Actor Loss": self.actor_loss_data}
+
+        df_critic = pd.DataFrame(data=data_dict_critic)
+        df_actor  = pd.DataFrame(data=data_dict_actor)
+
+        df_critic.to_csv("data/loss_critic", index=False)
+        df_actor.to_csv("data/loss_actor", index=False)
 
 class TD3AE:
     def __init__(self, obs_dim, act_dim, max_act_value, device, env_name):
@@ -168,6 +206,7 @@ class TD3AE:
         self.actor_target.train(True)
         self.decoder.train(True)
 
+
     def get_action_from_policy(self, state_image_pixel):
         with torch.no_grad():
             state_image_tensor = torch.FloatTensor(state_image_pixel)
@@ -181,9 +220,6 @@ class TD3AE:
 
         self.update_counter += 1  # this is used for delay update the actor
         states, actions, rewards, next_states, dones = memory_buffer.sample_experiences_from_buffer(batch_size)
-
-
-        #print(dones)
 
         with torch.no_grad():
             next_actions = self.actor_target(next_states)
@@ -206,6 +242,7 @@ class TD3AE:
         self.critic_optimizer.zero_grad()
         critic_loss_total.backward()
         self.critic_optimizer.step()
+
 
         # Delayed policy updates
         if self.update_counter % self.policy_freq_update == 0:
@@ -246,3 +283,5 @@ class TD3AE:
         torch.save(self.critic.encoder_net.state_dict(), f'trained_models/AE-TD3_encoder_{self.env_name}.pht')
         torch.save(self.decoder.state_dict(), f'trained_models/AE-TD3_decoder_{self.env_name}.pht')
         print("models have been saved...")
+
+

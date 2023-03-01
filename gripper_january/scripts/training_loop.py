@@ -1,13 +1,10 @@
 
 
-import time
-import signal
 import logging
 
 import torch
 import random
 import numpy as np
-from datetime import datetime
 from argparse import ArgumentParser
 
 from TD3 import TD3
@@ -18,9 +15,6 @@ from Plot import Plot
 
 logging.basicConfig(level=logging.INFO)
 
-def ctrlc_handler(signum, frame):
-    res = input("ctrl-c pressed. press anything to quit")
-    exit()
 
 def set_seeds(seed):
     torch.manual_seed(seed)
@@ -31,22 +25,28 @@ def normalise_state(state):
     state_norm = [(element - np.mean(state)) / np.std(state) for element in state]
     return state_norm
 
-
-
 def train(args, agent, memory, env, act_dim, file_name, plt):
     total_step_counter = 0
     historical_reward  = {}
     historical_reward["episode"] = []
     historical_reward["reward"]  = []
 
+    noise_scale         = 0.2
+    minimal_noise_scale = 0.01
+    noise_decay_range   = 0.9995
+
     for episode in range(0, args.train_episode_num):
         state = env.reset()
-        state = normalise_state(state)
+        #state = normalise_state(state)
         episode_reward = 0
         step           = 0
         done           = False
 
+        noise_scale =  noise_scale * noise_decay_range
+        noise_scale = max(minimal_noise_scale, noise_scale)
+
         for step in range(0, args.episode_horizont):
+            print("\n")
             logging.info(f"Taking step {step+1}/{args.episode_horizont}")
             total_step_counter += 1
 
@@ -55,11 +55,10 @@ def train(args, agent, memory, env, act_dim, file_name, plt):
                 action = agent.action_sample()
             else:
                 action = agent.select_action(state)
-                noise  = np.random.normal(0, scale=0.1, size=act_dim)
+                noise  = np.random.normal(0, scale=noise_scale, size=act_dim)
                 print("Pure action:", action)
                 action = action + noise
                 action = np.clip(action, -1, 1)
-                #action = action.astype(int) # this makes all the action zero o one, problem
                 action = action.tolist()
 
             print("Action:", action)
@@ -67,11 +66,12 @@ def train(args, agent, memory, env, act_dim, file_name, plt):
             next_state, reward, done, truncated = env.step(action)
             memory.add(state, action, reward, next_state, done)
             state = next_state
-            state = normalise_state(state)
+            #state = normalise_state(state)
 
             episode_reward += reward
 
-            if len(memory.buffer) >= args.max_exploration_steps: # todo add also batch_size check
+            if len(memory.buffer) >= args.max_exploration_steps:
+            #if len(memory.buffer) >= args.batch_size:
                 logging.info("Training Network")
                 for _ in range(0, args.G):
                     experiences = memory.sample(args.batch_size)
@@ -94,13 +94,13 @@ def parse_args():
     parser = ArgumentParser()
 
     parser.add_argument("--G",               type=int,  default=5)
-    parser.add_argument("--seed",            type=int,  default=777)
-    parser.add_argument("--batch_size",      type=int,  default=128) # 256
-    parser.add_argument("--buffer_capacity", type=int,  default=500_000)
+    parser.add_argument("--seed",            type=int,  default=0)
+    parser.add_argument("--batch_size",      type=int,  default=32) # 100
+    parser.add_argument("--buffer_capacity", type=int,  default=100_000)
 
     parser.add_argument("--train_episode_num",      type=int, default=5_000)  # 1000 Episodes
-    parser.add_argument("--episode_horizont",       type=int, default=50)      # 50
-    parser.add_argument("--max_exploration_steps",  type=int, default=2000)  # 3k - 5k Steps
+    parser.add_argument("--episode_horizont",       type=int, default=20)     # 50
+    parser.add_argument("--max_exploration_steps",  type=int, default=2000)   # 3k - 5k Steps
 
     parser.add_argument('--train_mode', type=str, default='aruco')  # aruco, servos, aruco_servos
     parser.add_argument('--usb_port',   type=str, default='/dev/ttyUSB1') # '/dev/ttyUSB1', '/dev/ttyUSB0'
@@ -124,14 +124,14 @@ def main():
     print("---------------------------------------")
 
     if args.train_mode == 'aruco':
-        logging.info("Training Using Aruco markers coord and Object's Yaw angle")
-        obs_dim = 15
+        logging.info("Training Using Aruco markers coord, target and Object's Yaw angle")
+        obs_dim = 16
     elif args.train_mode == 'servos':
-        logging.info("Training Using Servo positions and Object's Yaw angle")
-        obs_dim = 5
+        logging.info("Training Using Servo positions, target and Object's Yaw angle")
+        obs_dim = 6
     elif args.train_mode == 'aruco_servos':
-        logging.info("Training Using Aruco markers coord, Servo positions, and Object's Yaw angle")
-        obs_dim = 19
+        logging.info("Training Using Aruco markers coord, Servo positions, target and Object's Yaw angle")
+        obs_dim = 20
     else:
         logging.info("Please select a correct train mode")
         exit()

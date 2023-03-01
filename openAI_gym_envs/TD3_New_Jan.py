@@ -44,9 +44,9 @@ def define_parse_args():
 
     parser.add_argument('--memory_size',           type=int, default=int(1e6))
     parser.add_argument('--max_exploration_steps', type=int, default=int(60e3))
-    parser.add_argument('--max_training_steps',    type=int, default=int(1e6))
+    parser.add_argument('--max_training_steps',    type=int, default=int(80e3))  # 150e3
 
-    parser.add_argument('--env_name',   type=str, default='BipedalWalker-v3')  # BipedalWalker-v3, Pendulum-v1
+    parser.add_argument('--env_name',   type=str, default='Pendulum-v1')  # BipedalWalker-v3, Pendulum-v1
     parser.add_argument('--train_mode', type=str, default='normal')  # normal, autoencoder
     args   = parser.parse_args()
     return args
@@ -122,6 +122,7 @@ def main():
             episode_num += 1
 
     agent.save_models()
+    agent.plot_loss()
     plot_functions(total_rewards, env_name, args.train_mode)
 
 

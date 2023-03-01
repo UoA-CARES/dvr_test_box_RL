@@ -460,7 +460,7 @@ class SoftQNetworkSAC(nn.Module):
             nn.ReLU(),
             nn.Linear(self.hidden_size[1], self.hidden_size[2]),
             nn.ReLU(),
-            nn.Linear(self.hidden_size[2], 1)  # no sure why the output here is 1
+            nn.Linear(self.hidden_size[2], 1)
         )
 
         self.Q2 = nn.Sequential(
@@ -470,7 +470,7 @@ class SoftQNetworkSAC(nn.Module):
             nn.ReLU(),
             nn.Linear(self.hidden_size[1], self.hidden_size[2]),
             nn.ReLU(),
-            nn.Linear(self.hidden_size[2], 1)  # no sure why the output here is 1
+            nn.Linear(self.hidden_size[2], 1)
         )
 
     def forward(self, state, action):

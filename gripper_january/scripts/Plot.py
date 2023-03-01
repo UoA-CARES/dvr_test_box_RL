@@ -20,7 +20,7 @@ class Plot:
         self.x_label = x_label
         self.y_label = y_label
 
-        self.figure = plt.figure()
+        self.figure = plt.figure(1)
         self.figure.set_figwidth(8)
 
         self.x_data = x_data

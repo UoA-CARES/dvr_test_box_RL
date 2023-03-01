@@ -15,6 +15,8 @@ class Camera(object):
         if not self.camera.isOpened():
             raise Exception("Could not open video device")
 
+        #self.camera.set(38, 1)
+
         self.aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_50)  # aruco dictionary
         self.aruco_params = cv2.aruco.DetectorParameters_create()
         self.marker_size = 18  # mm
@@ -28,7 +30,13 @@ class Camera(object):
             self.camera_distortion = np.loadtxt(f"{file_path}/config/camera_distortion_RR.txt")
 
     def get_frame(self):
+        # read 5 times needed because frame delay. MUST BE INCLUDED
         returned, frame = self.camera.read()
+        returned, frame = self.camera.read()
+        returned, frame = self.camera.read()
+        returned, frame = self.camera.read()
+        returned, frame = self.camera.read()
+
         if returned:
             return frame
         print("Error: No frame returned")

@@ -7,8 +7,11 @@ import torch
 import torch.optim as optim
 import torch.nn.functional as F
 
-from Networks_Architectures import Actor_Normal as Actor
-from Networks_Architectures import Critic_Normal as Critic
+#from Networks_Architectures import Actor_Normal as Actor
+#from Networks_Architectures import Critic_Normal as Critic
+
+from Networks_Architectures import Actor_Lineal  as Actor
+from Networks_Architectures import Critic_Lineal as Critic
 
 
 class TD3:
@@ -18,19 +21,20 @@ class TD3:
         self.obs_dim = obs_dim
         self.act_dim = act_dim
 
-        self.max_action_value = 1
+        self.max_action_value =  1
         self.min_action_value = -1
 
         self.gamma      = 0.99
-        self.tau        = 0.005
-        self.lr_critic  = 3e-4 # 1e-3
-        self.lr_actor   = 3e-4 # 1e-4
+        self.tau        = 0.005  # 0.005
+
+        self.lr_actor  = 1e-4 # 1e-3 # 3e-4 # 1e-4
+        self.lr_critic = 1e-3 # 1e-3 # 3e-4 # 1e-3
 
         self.update_counter     = 0
         self.policy_freq_update = 2
 
         # main networks
-        self.actor  = Actor(self.obs_dim, self.act_dim, self.max_action_value).to(self.device)
+        self.actor  = Actor(self.obs_dim, self.act_dim).to(self.device)
         self.critic = Critic(self.obs_dim, self.act_dim).to(self.device)
 
         # target networks
@@ -87,8 +91,9 @@ class TD3:
             next_actions = torch.clamp(next_actions, min=self.min_action_value, max=self.max_action_value)
 
             target_q_values_one, target_q_values_two = self.critic_target(next_states, next_actions)
-            target_q_values = torch.min(target_q_values_one, target_q_values_two)
-            q_target        = rewards + (self.gamma * (1 - dones) * target_q_values)
+
+            target_q_values = torch.minimum(target_q_values_one, target_q_values_two)
+            q_target        = rewards + self.gamma * (1 - dones) * target_q_values
 
         q_vals_q1, q_vals_q2 = self.critic(states, actions)
 
@@ -98,8 +103,10 @@ class TD3:
 
         self.critic_optimizer.zero_grad()
         critic_loss_total.backward()
-        torch.nn.utils.clip_grad_value_(self.critic.parameters(), clip_value=1.0) # still no  100% sure about this 0.1
+        #torch.nn.utils.clip_grad_value_(self.critic.parameters(), clip_value=1.0)
+        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 1.0)
         self.critic_optimizer.step()
+
 
         # Delayed policy updates
         if self.update_counter % self.policy_freq_update == 0:
@@ -107,23 +114,33 @@ class TD3:
             pre_activation, actor_action  = self.actor(states)
             actor_q1, actor_q2 = self.critic(states, actor_action)
 
-            actor_q_min = torch.min(actor_q1, actor_q2)
+            actor_q_min = torch.minimum(actor_q1, actor_q2)
             actor_loss  = - actor_q_min.mean()
 
             # idea: Saturation Penalty
-            upper_saturation   = torch.tensor(2.6)
-            lower_saturation   = torch.tensor(-2.6)
+            #-------------------------------------------------------------------------------------
+            upper_saturation =  1.5 # 3
+            lower_saturation = -1.5 #-3
+            k_saturation     =  100 # this number is a empirical value could be changed
 
-            saturation_penalty = torch.max((pre_activation-upper_saturation), torch.tensor(0)) + torch.max((-pre_activation+lower_saturation), torch.tensor(0))
+            saturation_penalty_up = pre_activation - upper_saturation
+            saturation_penalty_up = torch.maximum(saturation_penalty_up, torch.tensor(0))
+
+            saturation_penalty_down = -pre_activation + lower_saturation
+            saturation_penalty_down = torch.maximum(saturation_penalty_down, torch.tensor(0))
+
+            saturation_penalty = saturation_penalty_up + saturation_penalty_down
             saturation_penalty = torch.square(saturation_penalty).mean()
+            saturation_penalty = k_saturation * saturation_penalty
+            #-------------------------------------------------------------------------------------
 
-            total_actor_loss = actor_loss + (0.3 * saturation_penalty)  # 0.3 is a empirical value could be changed
-
+            total_actor_loss = actor_loss + saturation_penalty
+            print(f"Actor Loss={actor_loss} Penalty={saturation_penalty}")
 
             self.actor_optimizer.zero_grad()
-            #actor_loss.backward()
             total_actor_loss.backward()
-            torch.nn.utils.clip_grad_value_(self.actor.parameters(), clip_value=1.0) # still no sure about this 0.1
+            #torch.nn.utils.clip_grad_value_(self.actor.parameters(), clip_value=0.1)
+            torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 1.0)
             self.actor_optimizer.step()
 
             # ------------------------------------- Update target networks --------------- #
