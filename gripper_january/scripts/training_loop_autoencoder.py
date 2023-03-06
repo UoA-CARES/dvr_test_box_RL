@@ -24,13 +24,13 @@ def parse_args():
     parser = ArgumentParser()
 
     parser.add_argument("--G",               type=int,  default=10)
-    parser.add_argument("--seed",            type=int,  default=5719)
-    parser.add_argument("--batch_size",      type=int,  default=100)
-    parser.add_argument("--buffer_capacity", type=int,  default=100_000)
+    parser.add_argument("--seed",            type=int,  default=500)
+    parser.add_argument("--batch_size",      type=int,  default=32)
+    parser.add_argument("--buffer_capacity", type=int,  default=1_000_000)
 
-    parser.add_argument("--train_episode_num",      type=int, default=5000)
+    parser.add_argument("--train_episode_num",      type=int, default=1000)
     parser.add_argument("--episode_horizont",       type=int, default=20)
-    parser.add_argument("--max_exploration_steps",  type=int, default=2000)   # 3k - 5k Steps
+    parser.add_argument("--max_exploration_steps",  type=int, default=3000)   # 3k - 5k Steps
 
 
     parser.add_argument('--train_mode', type=str, default='autoencoder')
@@ -39,7 +39,7 @@ def parse_args():
     parser.add_argument('--robot_id',   type=str, default='RR')  # RR, RL
     parser.add_argument('--camera_id',  type=int, default=0)  # 0, 2
     parser.add_argument('--num_motors', type=int, default=4)
-    parser.add_argument('--latent_dim', type=int, default=50)
+    parser.add_argument('--latent_dim', type=int, default=15)
 
     parser.add_argument('--plot_freq',  type=int, default=10)
 
@@ -66,9 +66,10 @@ def train(args, agent, memory, env, act_dim, file_name, plt):
             if total_step_counter < args.max_exploration_steps:
                 logging.info(f"Running Exploration Steps {total_step_counter}/{args.max_exploration_steps}")
                 action = agent.action_sample()
+
             else:
                 action = agent.select_action(state)
-                noise  = np.random.normal(0, scale=0.1, size=act_dim)
+                noise  = np.random.normal(0, scale=0.10, size=act_dim)
                 action = action + noise
                 action = np.clip(action, -1, 1)
                 action = action.tolist()

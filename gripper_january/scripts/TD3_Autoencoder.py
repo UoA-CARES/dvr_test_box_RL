@@ -15,7 +15,7 @@ class TD3:
         self.device  = device
 
         # -------- Hyperparameters ----------------------
-        hidden_size = [1024, 1024, 1024]
+        hidden_size = [1024, 1024]
 
         self.latent_dim = latent_dim
         self.action_dim = action_dim
@@ -120,7 +120,7 @@ class TD3:
 
         self.critic_optimizer.zero_grad()
         critic_loss_total.backward()
-        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 1.0)
+        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 0.1)
         self.critic_optimizer.step()
 
         # Update the actor and soft updates of targets networks
@@ -133,8 +133,8 @@ class TD3:
 
             #---------------------------
             # idea: Saturation Penalty
-            upper_saturation = 2.0
-            lower_saturation = 2.0
+            upper_saturation =  2.0
+            lower_saturation = -2.0
             k_saturation     = 1000 # this number is empirical value could be changed
 
             saturation_penalty_up = pre_activation - upper_saturation
@@ -153,7 +153,7 @@ class TD3:
 
             self.actor_optimizer.zero_grad()
             total_actor_loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 1.0)
+            torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 0.1)
             self.actor_optimizer.step()
 
             # ------------------------------------- Update target networks --------------- #
@@ -193,6 +193,7 @@ class TD3:
     def load_models(self, filename):
         # todo complete this
         pass
+
 
 
 

@@ -92,13 +92,12 @@ class Actor_Lineal(nn.Module):
         super(Actor_Lineal, self).__init__()
 
         if hidden_size is None:
-            hidden_size = [1024, 1024, 1024]
+            hidden_size = [1024, 1024]
         hidden_size = hidden_size
 
         self.l1 = nn.Linear(obs_dim, hidden_size[0])
         self.l2 = nn.Linear(hidden_size[0], hidden_size[1])
-        self.l3 = nn.Linear(hidden_size[1], hidden_size[2])
-        self.l4 = nn.Linear(hidden_size[2], actions_dim)
+        self.l3 = nn.Linear(hidden_size[1], actions_dim)
 
         self.ln = nn.LayerNorm(actions_dim)
 
@@ -107,10 +106,9 @@ class Actor_Lineal(nn.Module):
     def forward(self, state):
         a = F.relu(self.l1(state))
         a = F.relu(self.l2(a))
-        a = F.relu(self.l3(a))
 
-        pre_activation = self.l4(a)
-        #pre_activation = self.ln(pre_activation) # linear normalization layer
+        pre_activation = self.l3(a)
+        pre_activation = self.ln(pre_activation) # linear normalization layer
 
         output = torch.tanh(pre_activation)
         return pre_activation, output
@@ -121,20 +119,18 @@ class Critic_Lineal(nn.Module):
         super(Critic_Lineal, self).__init__()
 
         if hidden_size is None:
-            hidden_size = [1024, 1024, 1024]
+            hidden_size = [1024, 1024]
         hidden_size = hidden_size
 
         #Q1 architecture
         self.l1 = nn.Linear(obs_dim+action_dim, hidden_size[0])
         self.l2 = nn.Linear(hidden_size[0], hidden_size[1])
-        self.l3 = nn.Linear(hidden_size[1], hidden_size[2])
-        self.l4 = nn.Linear(hidden_size[2], 1)
+        self.l3 = nn.Linear(hidden_size[1], 1)
 
         #Q2 architecture
         self.l12 = nn.Linear(obs_dim+action_dim, hidden_size[0])
         self.l22 = nn.Linear(hidden_size[0], hidden_size[1])
-        self.l32 = nn.Linear(hidden_size[1], hidden_size[2])
-        self.l42 = nn.Linear(hidden_size[2], 1)
+        self.l32 = nn.Linear(hidden_size[1], 1)
 
         self.apply(weight_init)
 
@@ -143,13 +139,11 @@ class Critic_Lineal(nn.Module):
 
         q1 = F.relu(self.l1(obs_action))
         q1 = F.relu(self.l2(q1))
-        q1 = F.relu(self.l3(q1))
-        q1 = self.l4(q1)
+        q1 = self.l3(q1)
 
         q2 = F.relu(self.l12(obs_action))
         q2 = F.relu(self.l22(q2))
-        q2 = F.relu(self.l32(q2))
-        q2 = self.l42(q2)
+        q2 = self.l32(q2)
 
         return q1, q2
 
@@ -231,13 +225,12 @@ class Actor_AE(nn.Module):
         self.encoder_net = Encoder(latent_dim)
 
         if hidden_size is None:
-            hidden_size = [1024, 1024, 1024]
+            hidden_size = [1024, 1024]
         hidden_size = hidden_size
 
         self.l1 = nn.Linear(latent_dim, hidden_size[0])
         self.l2 = nn.Linear(hidden_size[0], hidden_size[1])
-        self.l3 = nn.Linear(hidden_size[1], hidden_size[2])
-        self.l4 = nn.Linear(hidden_size[2], action_dim)
+        self.l3 = nn.Linear(hidden_size[1], action_dim)
 
         self.ln = nn.LayerNorm(action_dim)
 
@@ -249,9 +242,8 @@ class Actor_AE(nn.Module):
 
         a = F.relu(self.l1(z_vector))
         a = F.relu(self.l2(a))
-        a = F.relu(self.l3(a))
 
-        pre_activation = self.l4(a)
+        pre_activation = self.l3(a)
         #pre_activation = self.ln(pre_activation) # linear normalization layer
 
         output = torch.tanh(pre_activation)
@@ -265,20 +257,18 @@ class Critic_AE(nn.Module):
         self.encoder_net = Encoder(latent_dim)
 
         if hidden_size is None:
-            hidden_size = [1024, 1024, 1024]
+            hidden_size = [1024, 1024]
         hidden_size = hidden_size
 
         #Q1 architecture
         self.l1 = nn.Linear(latent_dim+action_dim, hidden_size[0])
         self.l2 = nn.Linear(hidden_size[0], hidden_size[1])
-        self.l3 = nn.Linear(hidden_size[1], hidden_size[2])
-        self.l4 = nn.Linear(hidden_size[2], 1)
+        self.l3 = nn.Linear(hidden_size[1], 1)
 
         #Q2 architecture
         self.l12 = nn.Linear(latent_dim+action_dim, hidden_size[0])
         self.l22 = nn.Linear(hidden_size[0], hidden_size[1])
-        self.l32 = nn.Linear(hidden_size[1], hidden_size[2])
-        self.l42 = nn.Linear(hidden_size[2], 1)
+        self.l32 = nn.Linear(hidden_size[1], 1)
 
         self.apply(weight_init)
 
@@ -289,13 +279,11 @@ class Critic_AE(nn.Module):
 
         q1 = F.relu(self.l1(obs_action))
         q1 = F.relu(self.l2(q1))
-        q1 = F.relu(self.l3(q1))
-        q1 = self.l4(q1)
+        q1 = self.l3(q1)
 
         q2 = F.relu(self.l12(obs_action))
         q2 = F.relu(self.l22(q2))
-        q2 = F.relu(self.l32(q2))
-        q2 = self.l42(q2)
+        q2 = self.l32(q2)
 
         return q1, q2
 

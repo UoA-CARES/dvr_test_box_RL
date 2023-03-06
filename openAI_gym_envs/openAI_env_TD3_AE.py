@@ -29,11 +29,13 @@ from openAI_architectures_utilities import Actor, Critic, Decoder
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 class RLAgent:
-    def __init__(self, env, memory_size, device, batch_size, G):
+    def __init__(self, env, memory_size, device, batch_size, G, k):
 
         # env info
         self.max_action_value = env.action_space.high.max()
         self.env_name         = env.unwrapped.spec.id
+
+        self.k      = k  # number of stacked frames
 
         self.G      = G
         self.env    = env
@@ -59,12 +61,12 @@ class RLAgent:
         self.memory = Memory(memory_size, self.device)
 
         # main networks
-        self.actor  = Actor(self.latent_dim, self.action_dim, self.max_action_value).to(self.device)
-        self.critic = Critic(self.latent_dim, self.action_dim).to(self.device)
+        self.actor  = Actor(self.latent_dim, self.action_dim, self.max_action_value, self.k).to(self.device)
+        self.critic = Critic(self.latent_dim, self.action_dim, self.k).to(self.device)
 
         # target networks
-        self.actor_target  = Actor(self.latent_dim, self.action_dim, self.max_action_value).to(self.device)
-        self.critic_target = Critic(self.latent_dim, self.action_dim).to(self.device)
+        self.actor_target  = Actor(self.latent_dim, self.action_dim, self.max_action_value, self.k).to(self.device)
+        self.critic_target = Critic(self.latent_dim, self.action_dim, self.k).to(self.device)
 
         # tie encoders between actor and critic
         # with this, any changes in the critic encoder
@@ -76,7 +78,7 @@ class RLAgent:
         self.actor_target.load_state_dict(self.actor.state_dict())
 
         # main Decoder
-        self.decoder = Decoder(self.latent_dim).to(device)
+        self.decoder = Decoder(self.latent_dim, self.k).to(device)
 
         # Optimizer with default values
         self.encoder_optimizer = torch.optim.Adam(self.critic.encoder_net.parameters(), lr=self.encoder_lr)
@@ -263,7 +265,9 @@ def run_training_rl_method(env, agent, max_action_value, env_name, frames_stack,
     for episode in range(1, num_episodes_training + 1):
         state_image = frames_stack.reset()
         episode_reward = 0
+
         for step in range(1, episode_horizont + 1):
+
             action = agent.select_action_from_policy(state_image)
             noise  = np.random.normal(0, scale=0.1 * max_action_value, size=env.action_space.shape[0])
             action = action + noise
@@ -318,7 +322,7 @@ def policy_env_evaluation_function(agent, env, frames_stack):
 
 def define_parse_args():
     parser = ArgumentParser()
-    parser.add_argument('--k',          type=int, default=3)
+    parser.add_argument('--k',          type=int, default=3)  # number of stacked frames
     parser.add_argument('--G',          type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--seed',       type=int, default=0)
@@ -336,10 +340,10 @@ def main():
     max_action_value = env.action_space.high.max()  # --> 2 for pendulum, 1 for Walker
 
     if env_name == "Pendulum-v1":
-        num_exploration_episodes = 300
+        num_exploration_episodes = 300 # 300
         num_training_episodes    = 50
         episode_horizont         = 200
-        memory_size              = int(num_exploration_episodes*episode_horizont)
+        memory_size              = 1_000_000 # int(num_exploration_episodes*episode_horizont)
     else:
         num_exploration_episodes = 125
         num_training_episodes    = 1000
@@ -351,13 +355,13 @@ def main():
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
-    agent        = RLAgent(env, memory_size, device, args.batch_size, args.G)
+    agent        = RLAgent(env, memory_size, device, args.batch_size, args.G, args.k)
     frames_stack = FrameStack(args.k, env)
 
     run_random_exploration(env, agent, frames_stack, num_exploration_episodes=num_exploration_episodes, episode_horizont=episode_horizont)
     run_training_rl_method(env, agent, max_action_value, env_name, frames_stack, num_episodes_training=num_training_episodes, episode_horizont=episode_horizont)
-    #autoencoder_evaluation(agent, frames_stack, env_name, device)
-    #policy_env_evaluation_function(agent, env, frames_stack)
+    autoencoder_evaluation(agent, frames_stack, env_name, device)
+    policy_env_evaluation_function(agent, env, frames_stack)
     env.close()
 
 

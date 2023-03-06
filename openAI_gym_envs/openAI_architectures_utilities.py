@@ -3,10 +3,10 @@ import torch.nn as nn
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Actor(nn.Module):
-    def __init__(self, latent_dim, action_dim, max_value):
+    def __init__(self, latent_dim, action_dim, max_value, k):
         super(Actor, self).__init__()
         self.max_value   = max_value
-        self.encoder_net = Encoder(latent_dim)
+        self.encoder_net = Encoder(latent_dim, k)
 
         self.hidden_size = [1024, 1024]
         self.act_net = nn.Sequential(
@@ -46,10 +46,10 @@ class QFunction(nn.Module):
         return self.trunk(obs_action)
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Critic(nn.Module):
-    def __init__(self, latent_dim, action_dim):
+    def __init__(self, latent_dim, action_dim, k):
         super(Critic, self).__init__()
 
-        self.encoder_net = Encoder(latent_dim)
+        self.encoder_net = Encoder(latent_dim, k)
         self.hidden_dim  = [1024, 1024]
 
         self.Q1 = QFunction(latent_dim, action_dim, self.hidden_dim)
@@ -65,7 +65,7 @@ class Critic(nn.Module):
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Decoder(nn.Module):
-    def __init__(self, latent_dim):
+    def __init__(self, latent_dim, k):
         super(Decoder, self).__init__()
         self.num_filters = 32
         self.latent_dim  = latent_dim
@@ -79,7 +79,7 @@ class Decoder(nn.Module):
             nn.ReLU(),
             nn.ConvTranspose2d(in_channels=self.num_filters, out_channels=self.num_filters, kernel_size=3, stride=1),
             nn.ReLU(),
-            nn.ConvTranspose2d(in_channels=self.num_filters, out_channels=3, kernel_size=3, stride=2, output_padding=1),
+            nn.ConvTranspose2d(in_channels=self.num_filters, out_channels=k, kernel_size=3, stride=2, output_padding=1),
             nn.Sigmoid(),  # original paper no use activation function here. I added it and helps
         )
 
@@ -92,13 +92,13 @@ class Decoder(nn.Module):
         return x
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class Encoder(nn.Module):
-    def __init__(self, latent_dim):
+    def __init__(self, latent_dim, k):
         super(Encoder, self).__init__()
         self.num_layers  = 4
         self.num_filters = 32
         self.latent_dim = latent_dim
 
-        self.cov_net = nn.ModuleList([nn.Conv2d(3, self.num_filters, 3, stride=2)])
+        self.cov_net = nn.ModuleList([nn.Conv2d(k, self.num_filters, 3, stride=2)])
         for i in range(self.num_layers - 1):
             self.cov_net.append(nn.Conv2d(self.num_filters, self.num_filters, 3, stride=1))
 
