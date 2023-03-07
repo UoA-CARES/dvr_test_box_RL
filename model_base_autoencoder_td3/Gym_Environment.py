@@ -7,11 +7,13 @@ from collections import deque
 
 class CreateEnvironment:
     def __init__(self, env_name, k=3):
+
         self.env = gym.make(env_name)
         self.k   = k  # number of frames to be stacked
         self.frames_stacked = deque([], maxlen=k)
 
-        self.act_dim = self.env.action_space.shape[0]
+        self.act_dim    = self.env.action_space.shape[0]
+        self.max_action = self.env.action_space.high.max()
 
     def reset(self):
         self.env.reset()

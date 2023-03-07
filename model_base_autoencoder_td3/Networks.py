@@ -100,6 +100,8 @@ class WorldModel(nn.Module):
     def __init__(self, latent_dim=50, action_dim=1):
         super(WorldModel, self).__init__()
 
+        self.encoder_net = Encoder(latent_dim)
+
         hidden_size = [1024, 1024]
 
         self.model_net = nn.Sequential(
@@ -110,24 +112,44 @@ class WorldModel(nn.Module):
             nn.Linear(hidden_size[1], latent_dim),
         )
 
-    def forward(self, z_vector, action):
+    def forward(self, state, action, detach_encoder=False):
+        z_vector      = self.encoder_net(state, detach=detach_encoder)
         z_n_action    = torch.cat([z_vector, action], dim=1)
         z_vector_next = self.model_net(z_n_action)
         return z_vector_next
 
 
 
-#class RewardModel(nn.Module):
-    #pass
+class RewardModel(nn.Module):
+    def __init__(self, latent_dim=50, action_dim=1):
+        super(RewardModel, self).__init__()
 
+        self.encoder_net = Encoder(latent_dim)
+
+        hidden_size = [1024, 1024]
+
+        self.reward_net = nn.Sequential(
+            nn.Linear(latent_dim+action_dim, hidden_size[0]),
+            nn.ReLU(),
+            nn.Linear(hidden_size[0], hidden_size[1]),
+            nn.ReLU(),
+            nn.Linear(hidden_size[1], 1)
+        )
+
+    def forward(self, state, action, detach_encoder=False):
+        z_vector   = self.encoder_net(state, detach=detach_encoder)
+        z_n_action = torch.cat([z_vector, action], dim=1)
+        reward     = self.reward_net(z_n_action)
+        return reward
 # -------------------------------------------------------------------------------------------
 # -------------------------------------------------------------------------------------------
 
 class Actor_AE(nn.Module):
-    def __init__(self, latent_dim, action_dim, hidden_size=None):
+    def __init__(self, latent_dim, action_dim, max_value, hidden_size=None):
         super(Actor_AE, self).__init__()
 
         self.encoder_net = Encoder(latent_dim)
+        self.max_value = max_value
 
         if hidden_size is None:
             hidden_size = [1024, 1024]
@@ -151,7 +173,7 @@ class Actor_AE(nn.Module):
         #pre_activation = self.ln(pre_activation) # linear normalization layer
 
         output = torch.tanh(pre_activation)
-        return output
+        return output  * self.max_value
 
 
 # -------------------------------------------------------------------------------------------
