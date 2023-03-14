@@ -33,6 +33,7 @@ class CreateEnvironment:
         return stacked_vector, reward, done, info
 
     def preprocessing_image(self, image_array):
+        #img_cropped = image_array[100:400, 100:400]
         resized = cv2.resize(image_array, (84, 84), interpolation=cv2.INTER_AREA)
         gray_image = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
         norm_image = cv2.normalize(gray_image, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)

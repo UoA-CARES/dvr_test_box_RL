@@ -53,8 +53,11 @@ class Gripper(object):
         self.num_motors = num_motors
 
         leds = [1, 2, 3, 4]
-        min  = [300, 300, 300, 300]
-        max  = [700, 700, 700, 700]
+        #min  = [300, 300, 300, 300]
+        #max  = [700, 700, 700, 700]
+        min  = [370, 200, 540, 500]
+        max  = [470, 500, 640, 800]
+
 
         try:
             for i in range(0, self.num_motors):
@@ -176,7 +179,7 @@ class Gripper(object):
 
     def home(self):
         try:
-            home_pose = [310, 310, 690, 690]
+            home_pose = [370, 300, 640, 650]
             return self.move(home_pose)
         except DynamixelServoError as error:
             raise DynamixelServoError(f"Gripper#{self.gripper_id}: failed to Home") from error

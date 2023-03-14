@@ -38,16 +38,16 @@ def plot_functions(total_reward, env_name, style):
 def define_parse_args():
     parser = ArgumentParser()
     parser.add_argument('--k',           type=int, default=3)
-    parser.add_argument('--G',           type=int, default=5)
-    parser.add_argument('--batch_size',  type=int, default=256) #256
+    parser.add_argument('--G',           type=int, default=10)
+    parser.add_argument('--batch_size',  type=int, default=32) #256
     parser.add_argument('--seed',        type=int, default=0)
 
     parser.add_argument('--memory_size',           type=int, default=int(1e6))
-    parser.add_argument('--max_exploration_steps', type=int, default=int(60e3))
+    parser.add_argument('--max_exploration_steps', type=int, default=int(3000))
     parser.add_argument('--max_training_steps',    type=int, default=int(80e3))  # 150e3
 
     parser.add_argument('--env_name',   type=str, default='Pendulum-v1')  # BipedalWalker-v3, Pendulum-v1
-    parser.add_argument('--train_mode', type=str, default='normal')  # normal, autoencoder
+    parser.add_argument('--train_mode', type=str, default='autoencoder')  # normal, autoencoder
     args   = parser.parse_args()
     return args
 

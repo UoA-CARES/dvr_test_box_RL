@@ -18,7 +18,7 @@ class FrameStack:
 
     def pre_pro_image(self, frame):
         #frame = frame[240:820, 70:1020]
-        frame  = cv2.resize(frame, (84, 84), interpolation=cv2.INTER_AREA)
+        frame       = cv2.resize(frame, (84, 84), interpolation=cv2.INTER_AREA)
         img_gray    = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         norm_image  = cv2.normalize(img_gray, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
         #cv2.imshow("Normalized image", norm_image)

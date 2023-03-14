@@ -185,13 +185,34 @@ class Encoder(nn.Module):
         out    = torch.tanh(h_norm)
         return out
 
+    # def forward(self, obs, detach=False):
+    #     # what if I detach the whole encoder
+    #     if detach:
+    #         with torch.no_grad():
+    #             h    = self.forward_conv(obs)
+    #             h_fc = self.fc(h)
+    #             h_norm = self.ln(h_fc)
+    #             out = torch.tanh(h_norm)
+    #     else:
+    #         h    = self.forward_conv(obs)
+    #         h_fc = self.fc(h)
+    #         h_norm = self.ln(h_fc)
+    #         out = torch.tanh(h_norm)
+    #     return out
+
     def copy_conv_weights_from(self, model_source):
         for i in range(self.num_layers):
             tie_weights(src=model_source.cov_net[i], trg=self.cov_net[i])
 
+    def copy_all_weights_from(self, model_source):
+        for i in range(self.num_layers):
+            tie_weights(src=model_source.cov_net[i], trg=self.cov_net[i])
+        tie_weights(src=model_source.fc, trg=self.fc)
+        tie_weights(src=model_source.ln, trg=self.ln)
+
 
 class Decoder(nn.Module):
-    def __init__(self, latent_dim):
+    def __init__(self, latent_dim, k=3):
         super(Decoder, self).__init__()
         self.num_filters = 32
         self.latent_dim  = latent_dim
@@ -205,7 +226,7 @@ class Decoder(nn.Module):
             nn.ReLU(),
             nn.ConvTranspose2d(in_channels=self.num_filters, out_channels=self.num_filters, kernel_size=3, stride=1),
             nn.ReLU(),
-            nn.ConvTranspose2d(in_channels=self.num_filters, out_channels=3, kernel_size=3, stride=2, output_padding=1),
+            nn.ConvTranspose2d(in_channels=self.num_filters, out_channels=k, kernel_size=3, stride=2, output_padding=1),
             nn.Sigmoid(),  # original paper no use activation function here. I added it and helps
         )
 
@@ -247,7 +268,7 @@ class Actor_AE(nn.Module):
         #pre_activation = self.ln(pre_activation) # linear normalization layer
 
         output = torch.tanh(pre_activation)
-        return pre_activation, output
+        return output
 
 
 class Critic_AE(nn.Module):

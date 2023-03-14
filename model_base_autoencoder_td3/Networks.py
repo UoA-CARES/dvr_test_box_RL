@@ -43,6 +43,7 @@ class Encoder(nn.Module):
         self.fc = nn.Linear(39200, self.latent_dim)
         self.ln = nn.LayerNorm(self.latent_dim)
 
+
     def forward_conv(self, x):
         conv = torch.relu(self.cov_net[0](x))
         for i in range(1, self.num_layers):
@@ -50,19 +51,42 @@ class Encoder(nn.Module):
         h = torch.flatten(conv, start_dim=1)
         return h
 
+    '''
     def forward(self, obs, detach=False):
         h = self.forward_conv(obs)
         if detach:
             h = h.detach()
-            # todo maybe it is necessary detach the fc and norm too
         h_fc   = self.fc(h)
         h_norm = self.ln(h_fc)
         out    = torch.tanh(h_norm)
         return out
+    '''
+    def forward(self, obs, detach=False):
+        # what if I detach the whole encoder
+        if detach:
+            with torch.no_grad():
+                h    = self.forward_conv(obs)
+                h_fc = self.fc(h)
+                h_norm = self.ln(h_fc)
+                out = torch.tanh(h_norm)
+        else:
+            h    = self.forward_conv(obs)
+            h_fc = self.fc(h)
+            h_norm = self.ln(h_fc)
+            out = torch.tanh(h_norm)
+        return out
+
 
     def copy_conv_weights_from(self, model_source):
         for i in range(self.num_layers):
             tie_weights(src=model_source.cov_net[i], trg=self.cov_net[i])
+
+    def copy_all_weights_from(self, model_source):
+        for i in range(self.num_layers):
+            tie_weights(src=model_source.cov_net[i], trg=self.cov_net[i])
+        tie_weights(src=model_source.fc, trg=self.fc)
+        tie_weights(src=model_source.ln, trg=self.ln)
+
 
 # -------------------------------------------------------------------------------------------
 # -------------------------------------------------------------------------------------------
@@ -169,6 +193,7 @@ class Actor_AE(nn.Module):
 
         a = F.relu(self.l1(z_vector))
         a = F.relu(self.l2(a))
+
         pre_activation = self.l3(a)
         #pre_activation = self.ln(pre_activation) # linear normalization layer
 
@@ -214,3 +239,75 @@ class Critic_AE(nn.Module):
         q2 = self.l32(q2)
 
         return q1, q2
+
+
+
+
+
+# -------------------------------------------------------------------------------------------
+# These networks are used for normal vector_state TD3 algorithm
+# -------------------------------------------------------------------------------------------
+class Critic_Normal(nn.Module):
+    def __init__(self, obs_dim, action_dim, hidden_size=None):
+        super(Critic_Normal, self).__init__()
+
+        if hidden_size is None:
+            hidden_size = [1024, 1024]
+        hidden_size = hidden_size
+
+        #Q1 architecture
+        self.l1 = nn.Linear(obs_dim+action_dim, hidden_size[0])
+        self.l2 = nn.Linear(hidden_size[0], hidden_size[1])
+        self.l3 = nn.Linear(hidden_size[1], 1)
+
+        #Q2 architecture
+        self.l12 = nn.Linear(obs_dim+action_dim, hidden_size[0])
+        self.l22 = nn.Linear(hidden_size[0], hidden_size[1])
+        self.l32 = nn.Linear(hidden_size[1], 1)
+
+        self.apply(weight_init)
+
+    def forward(self, state, action):
+
+        obs_action = torch.cat([state, action], dim=1)
+
+        q1 = F.relu(self.l1(obs_action))
+        q1 = F.relu(self.l2(q1))
+        q1 = self.l3(q1)
+
+        q2 = F.relu(self.l12(obs_action))
+        q2 = F.relu(self.l22(q2))
+        q2 = self.l32(q2)
+
+        return q1, q2
+
+
+
+class Actor_Normal(nn.Module):
+    def __init__(self, obs_dim, action_dim, max_value, hidden_size=None):
+        super(Actor_Normal, self).__init__()
+
+        self.max_value = max_value
+
+        if hidden_size is None:
+            hidden_size = [1024, 1024]
+        hidden_size = hidden_size
+
+        self.l1 = nn.Linear(obs_dim, hidden_size[0])
+        self.l2 = nn.Linear(hidden_size[0], hidden_size[1])
+        self.l3 = nn.Linear(hidden_size[1], action_dim)
+
+        self.ln = nn.LayerNorm(action_dim)
+
+        self.apply(weight_init)
+
+    def forward(self, state):
+
+        a = F.relu(self.l1(state))
+        a = F.relu(self.l2(a))
+
+        pre_activation = self.l3(a)
+        #pre_activation = self.ln(pre_activation) # linear normalization layer
+        output = torch.tanh(pre_activation)
+
+        return output  * self.max_value

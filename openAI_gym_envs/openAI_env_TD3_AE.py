@@ -116,10 +116,10 @@ class RLAgent:
                     target_noise = 0.2 * torch.randn_like(next_actions)
                     target_noise = target_noise.clamp(-0.5, 0.5)
                     next_actions = next_actions + target_noise
-                    next_actions = next_actions.clamp(-self.max_action_value, self.max_action_value)
+                    next_actions = torch.clamp(next_actions, min=-self.max_action_value, max=self.max_action_value)
 
                     next_q_values_q1, next_q_values_q2 = self.critic_target(next_states_batch, next_actions)
-                    q_min = torch.min(next_q_values_q1, next_q_values_q2)
+                    q_min = torch.minimum(next_q_values_q1, next_q_values_q2)
                     q_target = rewards_batch + (self.gamma * (1 - dones_batch) * q_min)
 
                 q1, q2 = self.critic(state_batch, actions_batch)
@@ -135,10 +135,10 @@ class RLAgent:
                 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 # Update the actor and soft updates of targets networks
                 if self.update_counter % self.policy_freq_update == 0:
-                    action_actor = self.actor(state_batch, detach_encoder=True)
+                    action_actor       = self.actor(state_batch, detach_encoder=True)
                     actor_q1, actor_q2 = self.critic(state_batch, action_actor, detach_encoder=True)
 
-                    actor_q_min = torch.min(actor_q1, actor_q2)
+                    actor_q_min = torch.minimum(actor_q1, actor_q2)
                     actor_loss  = - actor_q_min.mean()
 
                     self.actor_optimizer.zero_grad()
@@ -325,7 +325,7 @@ def define_parse_args():
     parser.add_argument('--k',          type=int, default=3)  # number of stacked frames
     parser.add_argument('--G',          type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--seed',       type=int, default=0)
+    parser.add_argument('--seed',       type=int, default=571)
     parser.add_argument('--env_name',   type=str, default='Pendulum-v1')  # BipedalWalker-v3
     args   = parser.parse_args()
     return args
@@ -340,7 +340,7 @@ def main():
     max_action_value = env.action_space.high.max()  # --> 2 for pendulum, 1 for Walker
 
     if env_name == "Pendulum-v1":
-        num_exploration_episodes = 300 # 300
+        num_exploration_episodes = 50 # 300
         num_training_episodes    = 50
         episode_horizont         = 200
         memory_size              = 1_000_000 # int(num_exploration_episodes*episode_horizont)

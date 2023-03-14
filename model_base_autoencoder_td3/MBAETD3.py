@@ -47,22 +47,23 @@ class MB_AE_TD3:
         self.decoder = Decoder(self.latent_dim).to(self.device)
 
         # main networks Models
-        self.world_model  = WorldModel(self.latent_dim).to(self.device)
-        self.reward_model = RewardModel(self.latent_dim).to(self.device)
+        self.world_model  = WorldModel(self.latent_dim, self.action_dim).to(self.device)
+        self.reward_model = RewardModel(self.latent_dim, self.action_dim).to(self.device)
 
         # target networks RL
         self.actor_target  = Actor(self.latent_dim, self.action_dim, self.max_action_value).to(self.device)
         self.critic_target = Critic(self.latent_dim, self.action_dim).to(self.device)
 
-        # ------------------------- tie encoders --------------------------------------#
+        # -------------------- tie encoders--------------------------------#
         # tie encoders between actor and critic
-        self.actor.encoder_net.copy_conv_weights_from(self.critic.encoder_net)
-        # tie encoders between world transition model and critic
-        self.world_model.encoder_net.copy_conv_weights_from(self.critic.encoder_net)
-        # tie encoders between reward model  and critic
-        self.reward_model.encoder_net.copy_conv_weights_from(self.critic.encoder_net)
-        # -----------------------------------------------------------------------------#
+        #self.actor.encoder_net.copy_conv_weights_from(self.critic.encoder_net)
+        #self.world_model.encoder_net.copy_conv_weights_from(self.critic.encoder_net)
+        #self.reward_model.encoder_net.copy_conv_weights_from(self.critic.encoder_net)
 
+        self.actor.encoder_net.copy_all_weights_from(self.critic.encoder_net)
+        self.world_model.encoder_net.copy_all_weights_from(self.critic.encoder_net)
+        self.reward_model.encoder_net.copy_all_weights_from(self.critic.encoder_net)
+        # -----------------------------------------------------------------------------#
 
         # copy weights and bias from main to target networks
         self.critic_target.load_state_dict(self.critic.state_dict())
@@ -105,7 +106,7 @@ class MB_AE_TD3:
 
         # batch of actions from currently policy
         with torch.no_grad():
-            action_tensor = self.actor(states_tensor)
+            action_tensor = self.actor(states_tensor, detach_encoder=True)
             actions       = action_tensor.cpu().data.numpy()
 
         # predict batch new "dream" samples
@@ -136,7 +137,7 @@ class MB_AE_TD3:
         actions     = torch.FloatTensor(np.asarray(actions)).to(self.device)
         next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
 
-        z_vector_next_true = self.world_model.encoder_net(next_states, detach=True)
+        z_vector_next_true       = self.world_model.encoder_net(next_states, detach=True)
         z_vector_next_prediction = self.world_model(states, actions, detach_encoder=True)
 
         model_loss = F.mse_loss(z_vector_next_true, z_vector_next_prediction)
@@ -145,7 +146,7 @@ class MB_AE_TD3:
         model_loss.backward()
         self.world_model_optimizer.step()
 
-        logging.info(f"Transition model loss: {model_loss.item()}")
+        #logging.info(f"Transition model loss: {model_loss.item()}")
 
     def train_reward_model(self, experiences):
 
@@ -155,6 +156,7 @@ class MB_AE_TD3:
         states  = torch.FloatTensor(np.asarray(states)).to(self.device)
         actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
         rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
+
         rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
 
         reward_prediction = self.reward_model(states, actions, detach_encoder=True)
@@ -165,7 +167,7 @@ class MB_AE_TD3:
         reward_model_loss.backward()
         self.reward_model_optimizer.step()
 
-        logging.info(f"Reward model loss: {reward_model_loss.item()}")
+        #logging.info(f"Reward model loss: {reward_model_loss.item()}")
 
     def train_policy(self, experiences):
         self.update_counter += 1
@@ -176,13 +178,20 @@ class MB_AE_TD3:
         # Convert into tensor
         states      = torch.FloatTensor(np.asarray(states)).to(self.device)
         actions     = torch.FloatTensor(np.asarray(actions)).to(self.device)
-        rewards     = torch.FloatTensor(rewards).to(self.device)
+        rewards     = torch.FloatTensor(np.asarray(rewards)).to(self.device)
         next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
-        dones       = torch.FloatTensor(dones).to(self.device)
+        dones       = torch.FloatTensor(np.asarray(dones)).to(self.device)
 
         # Reshape in the right order
         rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
         dones   = dones.unsqueeze(0).reshape(batch_size, 1)
+
+        # print("states:", states.shape)
+        # print("actions:", actions.shape)
+        # print("rewards:", rewards.shape)
+        # print("next_states:", next_states.shape)
+        # print("dones:", dones.shape)
+
 
         # update the critic part
         with torch.no_grad():
@@ -205,13 +214,13 @@ class MB_AE_TD3:
 
         self.critic_optimizer.zero_grad()
         critic_loss_total.backward()
-        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 0.1)
+        #torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 0.1)
         self.critic_optimizer.step()
 
         # Update the actor and soft updates of targets networks
         if self.update_counter % self.policy_freq_update == 0:
-            actor_action = self.actor(states, detach_encoder=True)
-            actor_q1, actor_q2           = self.critic(states, actor_action, detach_encoder=True)
+            actor_action        = self.actor(states, detach_encoder=True)
+            actor_q1, actor_q2  = self.critic(states, actor_action, detach_encoder=True)
 
             actor_q_min = torch.minimum(actor_q1, actor_q2)
             actor_loss  = - actor_q_min.mean()
@@ -252,3 +261,17 @@ class MB_AE_TD3:
 
         torch.save(self.world_model.state_dict(), f'models/{filename}_world_model.pht')
         torch.save(self.reward_model.state_dict(), f'models/{filename}_reward_model.pht')
+
+        logging.info("models has been saved...")
+
+    def load_models(self, filename):
+        self.actor.load_state_dict(torch.load(f'models/{filename}_actor_model.pht'))
+        self.critic.load_state_dict(torch.load(f'models/{filename}_critic_mode.pht'))
+
+        self.critic.encoder_net.load_state_dict(torch.load(f'models/{filename}_encoder_model.pht'))
+        self.decoder.load_state_dict(torch.load(f'models/{filename}_decoder_model.pht'))
+
+        self.world_model.load_state_dict(torch.load(f'models/{filename}_world_model.pht'))
+        self.reward_model.load_state_dict(torch.load(f'models/{filename}_reward_model.pht'))
+
+        logging.info("models has been loaded...")
