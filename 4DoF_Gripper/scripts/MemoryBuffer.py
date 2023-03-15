@@ -1,8 +1,9 @@
-from collections import deque
+
 import random
+from collections import deque
+
 
 class MemoryBuffer:
-
     def __init__(self, max_capacity):
         self.buffer = deque([], maxlen=max_capacity)
 

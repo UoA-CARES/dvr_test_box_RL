@@ -15,13 +15,13 @@ class TD3:
     def __init__(self, device, latent_dim, action_dim):
 
         # -------- Hyperparameters ----------------------
-        hidden_size = [1024, 1024]
-
         encoder_lr = 1e-3
         decoder_lr = 1e-3
 
         actor_lr   = 1e-4
         critic_lr  = 1e-3
+
+        hidden_size = [1024, 1024]
 
         self.tau   = 0.005
         self.gamma = 0.99
@@ -35,8 +35,8 @@ class TD3:
         # ------------------------------------------------
 
         # main networks RL Agent
-        self.actor   = Actor(self.latent_dim, self.action_dim, hidden_size).to(self.device)
-        self.critic  = Critic(self.latent_dim, self.action_dim, hidden_size).to(self.device)
+        self.actor   = Actor(self.latent_dim, self.action_dim).to(self.device)
+        self.critic  = Critic(self.latent_dim, self.action_dim).to(self.device)
         self.decoder = Decoder(self.latent_dim).to(device)
 
         # target networks
@@ -69,10 +69,10 @@ class TD3:
         self.actor_target.train(True)
 
 
-    def select_action(self, state):
+    def select_action_from_policy(self, state):
         with torch.no_grad():
             state_image_tensor = torch.FloatTensor(state)
-            state_image_tensor = state_image_tensor.unsqueeze(0).to(self.device)  # torch.Size([1, 3, 84, 84])
+            state_image_tensor = state_image_tensor.unsqueeze(0).to(self.device)
             action = self.actor(state_image_tensor)
             action = action.cpu().data.numpy().flatten()
         return action
@@ -85,7 +85,7 @@ class TD3:
             action.append(a)
         return action
 
-    def learn(self, experiences):
+    def train_policy(self, experiences):
         self.update_counter += 1
 
         states, actions, rewards, next_states, dones = experiences
@@ -134,7 +134,6 @@ class TD3:
 
             actor_q_min = torch.minimum(actor_q1, actor_q2)
             actor_loss  = - actor_q_min.mean()
-
             #---------------------------
             # idea: Saturation Penalty
             # upper_saturation =  2.0
@@ -167,7 +166,6 @@ class TD3:
             for target_param, param in zip(self.actor_target.parameters(), self.actor.parameters()):
                 target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
 
-
         # Update the autoencoder part
         z_vector = self.critic.encoder_net(states)
         rec_obs  = self.decoder(z_vector)
@@ -185,23 +183,21 @@ class TD3:
 
 
     def save_models(self, filename):
-        torch.save(self.actor.state_dict(),  f'models/{filename}_actor.pht')
-        torch.save(self.critic.state_dict(), f'models/{filename}_critic.pht')
+        torch.save(self.actor.state_dict(),  f'models/{filename}_actor_model.pht')
+        torch.save(self.critic.state_dict(), f'models/{filename}_critic_model.pht')
 
-        torch.save(self.critic.encoder_net.state_dict(), f'models/{filename}_encoder.pht')
-        torch.save(self.decoder.state_dict(), f'models/{filename}_decoder.pht')
+        torch.save(self.critic.encoder_net.state_dict(), f'models/{filename}_encoder_model.pht')
+        torch.save(self.decoder.state_dict(), f'models/{filename}_decoder_model.pht')
 
         logging.info("models has been saved...")
 
 
     def load_models(self, filename):
 
-        self.actor.load_state_dict(torch.load(f'models/{filename}_actor.pht'))
-        self.critic.load_state_dict(torch.load(f'models/{filename}_critic.pht'))
+        self.actor.load_state_dict(torch.load(f'models/{filename}_actor_model.pht'))
+        self.critic.load_state_dict(torch.load(f'models/{filename}_critic_model.pht'))
 
-        self.critic.encoder_net.load_state_dict(torch.load(f'models/{filename}_encoder.pht'))
-        self.decoder.load_state_dict(torch.load(f'models/{filename}_decoder.pht'))
+        self.critic.encoder_net.load_state_dict(torch.load(f'models/{filename}_encoder_model.pht'))
+        self.decoder.load_state_dict(torch.load(f'models/{filename}_decoder_model.pht'))
 
         logging.info("models has been loaded...")
-
-

@@ -26,6 +26,7 @@ class GripperEnvironment:
         self.object_marker_id  = 6
         self.marker_ids_vector = [0, 1, 2, 3, 4, 5, 6]
 
+        self.noise_tolerance = 3
         self.frame_stack = FrameStack()
 
     def reset(self):
@@ -53,7 +54,13 @@ class GripperEnvironment:
             frame_stack = None
             marker_coordinates_all = self.find_joint_coordinates(marker_pose_all)
 
+
         self.target_angle = self.choose_target_angle()
+        angle_difference  = np.abs(self.target_angle - object_marker_yaw)
+
+        if angle_difference <= self.noise_tolerance:
+            self.target_angle = self.choose_target_angle()
+
         logging.info(f"New Goal Angle Generated : {self.target_angle}")
 
         state = self.define_state_space(current_servo_positions, marker_coordinates_all, frame_stack, object_marker_yaw)
@@ -83,18 +90,18 @@ class GripperEnvironment:
         angle_difference = np.abs(target_angle - valve_angle_after)
         delta_changes    = np.abs(target_angle - valve_angle_before) - np.abs(target_angle - valve_angle_after)
 
-        noise_tolerance = 3
-        if -noise_tolerance <= delta_changes <= noise_tolerance:
+        if -self.noise_tolerance <= delta_changes <= self.noise_tolerance:
             reward = 0
         else:
             reward = delta_changes
 
-        if angle_difference <= noise_tolerance:
+        if angle_difference <= self.noise_tolerance:
             reward = reward + 100
             logging.info("--------------------Reached the Goal Angle!-----------------")
             done = True
 
         return reward, done
+
 
     def find_marker_pose(self, marker_ids_vector):
         i = 0
@@ -127,7 +134,7 @@ class GripperEnvironment:
         state_space_vector = []
         if self.train_mode == 'servos':
             servos_position.append(object_marker_yaw)
-            servos_position.append(self.target_angle)
+            #servos_position.append(self.target_angle)
             state_space_vector = servos_position
 
         elif self.train_mode == 'aruco_servos':
@@ -135,13 +142,13 @@ class GripperEnvironment:
             coordinate_vector.append(object_marker_yaw)
             for i in servos_position:
                 coordinate_vector.append(i)
-            coordinate_vector.append(self.target_angle)
+            #coordinate_vector.append(self.target_angle)
             state_space_vector = coordinate_vector
 
         elif self.train_mode == 'aruco':
             coordinate_vector = [element for state_space_list in marker_coordinates for element in state_space_list]
             coordinate_vector.append(object_marker_yaw)
-            coordinate_vector.append(self.target_angle)
+            #coordinate_vector.append(self.target_angle)
             state_space_vector = coordinate_vector
 
         elif self.train_mode == 'autoencoder':

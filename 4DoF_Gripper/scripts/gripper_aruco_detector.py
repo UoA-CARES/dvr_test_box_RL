@@ -72,7 +72,6 @@ class ArucoDetector:
                 id    = ids[i][0]
                 r_vec = r_vecs[i]
                 t_vec = t_vecs[i]
-                # TODO: change this to output something less bulky than two arrays
                 marker_poses[id] = self.get_pose(t_vec, r_vec)
 
         return marker_poses

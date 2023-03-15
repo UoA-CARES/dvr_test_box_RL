@@ -1,8 +1,7 @@
 
-import numpy as np
 import cv2
+import numpy as np
 from collections import deque
-
 
 
 class FrameStack:
@@ -14,7 +13,6 @@ class FrameStack:
         for _ in range(self.k):
             self.frames_stacked.append(frame)
         return np.array(list(self.frames_stacked))
-
 
     def pre_pro_image(self, frame):
         #frame = frame[240:820, 70:1020]
