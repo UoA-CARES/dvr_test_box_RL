@@ -1,6 +1,4 @@
 
-
-import time
 import logging
 import numpy as np
 
@@ -11,13 +9,13 @@ from FrameStack import FrameStack
 #from cares_lib.vision.ArucoDetector import ArucoDetector
 from gripper_aruco_detector import ArucoDetector  # TODO use the lib from cares
 
-#logging.basicConfig(level=logging.DEBUG)
 
 class GripperEnvironment:
-    def __init__(self, num_motors=4, camera_id=0, device_name="/dev/ttyUSB1", train_mode='aruco', robot_id='RR'):
+    def __init__(self, num_motors=4, camera_id=0, device_name="/dev/ttyUSB1", train_mode='vector', robot_id='RR'):
 
-        self.gripper = Gripper(num_motors=num_motors, device_name=device_name)
-        self.camera  = Camera(camera_id=camera_id, robot_id=robot_id)
+        self.gripper     = Gripper(num_motors=num_motors, device_name=device_name)
+        self.camera      = Camera(camera_id=camera_id, robot_id=robot_id)
+        self.frame_stack = FrameStack()
 
         self.aruco_detector = ArucoDetector(marker_size=18)
         self.target_angle   = self.choose_target_angle()
@@ -26,14 +24,13 @@ class GripperEnvironment:
         self.object_marker_id  = 6
         self.marker_ids_vector = [0, 1, 2, 3, 4, 5, 6]
 
-        self.noise_tolerance = 3
-        self.frame_stack = FrameStack()
+        self.noise_tolerance = 5
+
 
     def reset(self):
         try:
             current_servo_positions = self.gripper.home()
         except GripperError as error:
-            # handle what to do if the gripper is unrecoverably gone wrong - i.e. save data and fail gracefully
             logging.error(error)
             exit()
 
@@ -43,32 +40,30 @@ class GripperEnvironment:
         if self.train_mode == 'autoencoder':
             marker_coordinates_all = None
             frame = self.camera.get_frame()
-            frame = self.frame_stack.pre_pro_image(frame)
-            frame_stack = self.frame_stack.stack_reset(frame)
+            pre_pro_frame = self.frame_stack.pre_pro_image(frame)
+            frame_stack   = self.frame_stack.stack_reset(pre_pro_frame)
 
-        elif self.train_mode == 'servos':
-            frame_stack = None
-            marker_coordinates_all = None
-
-        else:
-            frame_stack = None
+        elif self.train_mode == 'vector':
             marker_coordinates_all = self.find_joint_coordinates(marker_pose_all)
-
+            frame_stack = None
 
         self.target_angle = self.choose_target_angle()
-        angle_difference  = np.abs(self.target_angle - object_marker_yaw)
-
-        if angle_difference <= self.noise_tolerance:
-            self.target_angle = self.choose_target_angle()
-
-        logging.info(f"New Goal Angle Generated : {self.target_angle}")
+        # Check if the current yaw of the object is not the same as the new target angle,
+        # this is in order to avoid getting a reward after doing nothing
+        while True:
+            angle_difference = np.abs(self.target_angle - object_marker_yaw)
+            if angle_difference <= self.noise_tolerance:
+                self.target_angle = self.choose_target_angle()
+            else:
+                logging.info(f"New Goal Angle Generated : {self.target_angle}")
+                break
 
         state = self.define_state_space(current_servo_positions, marker_coordinates_all, frame_stack, object_marker_yaw)
         return state
 
 
     def choose_target_angle(self):
-        '''
+        #return np.random.randint(low=0, high=360)
         target_angle = np.random.randint(1, 5)
         if target_angle == 1:
             return 90
@@ -78,9 +73,6 @@ class GripperEnvironment:
             return 270
         elif target_angle == 4:
             return 0
-        '''
-        return np.random.randint(low=0, high=360)
-
 
     def reward_function(self, target_angle, start_marker_pose, final_marker_pose):
         done = False
@@ -96,28 +88,21 @@ class GripperEnvironment:
             reward = delta_changes
 
         if angle_difference <= self.noise_tolerance:
-            reward = reward + 100
             logging.info("--------------------Reached the Goal Angle!-----------------")
+            reward = reward + 100
             done = True
-
         return reward, done
 
 
     def find_marker_pose(self, marker_ids_vector):
-        i = 0
         while True:
-            i += 1
-            logging.debug(f"Attempting to detect markers attempt {i}")
+            logging.debug(f"Attempting to detect markers ")
             frame        = self.camera.get_frame()
             marker_poses = self.aruco_detector.get_marker_poses(frame, self.camera.camera_matrix, self.camera.camera_distortion)
 
-            if self.train_mode == "servos":
-                if self.object_marker_id in marker_poses:
-                    break
-            else:
-                # this check if all the seven marker are detected and return all the poses and double check for false detections
-                if all(ids in marker_poses for ids in marker_ids_vector) and len(marker_poses) == len(marker_ids_vector):
-                    break
+            # this check if all the seven marker are detected and return all the poses and double check for false detections
+            if all(ids in marker_poses for ids in marker_ids_vector) and len(marker_poses) == len(marker_ids_vector):
+                break
         return marker_poses
 
     def find_joint_coordinates(self, markers_pose):
@@ -131,21 +116,20 @@ class GripperEnvironment:
 
     def define_state_space(self, servos_position, marker_coordinates, frame_stack, object_marker_yaw):
 
+        # if self.train_mode == 'servos':
+        #     servos_position.append(object_marker_yaw)
+        #     #servos_position.append(self.target_angle)
+        #     state_space_vector = servos_position
+        # elif self.train_mode == 'aruco_servos':
+        #     coordinate_vector = [element for state_space_list in marker_coordinates for element in state_space_list]
+        #     coordinate_vector.append(object_marker_yaw)
+        #     for i in servos_position:
+        #         coordinate_vector.append(i)
+        #     #coordinate_vector.append(self.target_angle)
+        #     state_space_vector = coordinate_vector
+
         state_space_vector = []
-        if self.train_mode == 'servos':
-            servos_position.append(object_marker_yaw)
-            #servos_position.append(self.target_angle)
-            state_space_vector = servos_position
-
-        elif self.train_mode == 'aruco_servos':
-            coordinate_vector = [element for state_space_list in marker_coordinates for element in state_space_list]
-            coordinate_vector.append(object_marker_yaw)
-            for i in servos_position:
-                coordinate_vector.append(i)
-            #coordinate_vector.append(self.target_angle)
-            state_space_vector = coordinate_vector
-
-        elif self.train_mode == 'aruco':
+        if self.train_mode == 'vector':
             coordinate_vector = [element for state_space_list in marker_coordinates for element in state_space_list]
             coordinate_vector.append(object_marker_yaw)
             #coordinate_vector.append(self.target_angle)
@@ -156,8 +140,8 @@ class GripperEnvironment:
 
         return state_space_vector
 
-    def step(self, action):
 
+    def step(self, action):
         start_marker_pose_all   = self.find_marker_pose(marker_ids_vector=self.marker_ids_vector)
         start_object_marker_yaw = start_marker_pose_all[self.object_marker_id][1][2]
 
@@ -176,20 +160,15 @@ class GripperEnvironment:
         if self.train_mode == 'autoencoder':
             final_marker_coordinates_all = None
             frame = self.camera.get_frame()
-            frame = self.frame_stack.pre_pro_image(frame)
-            frame_stack = self.frame_stack.stack_vector(frame)
+            pre_pro_frame = self.frame_stack.pre_pro_image(frame)
+            frame_stack   = self.frame_stack.stack_vector(pre_pro_frame)
 
-        elif self.train_mode == 'servos':
-            frame_stack = None
-            final_marker_coordinates_all = None
-
-        else:
+        elif self.train_mode == 'vector':
             frame_stack = None
             final_marker_coordinates_all = self.find_joint_coordinates(final_marker_pose_all)
 
         state        = self.define_state_space(current_servo_positions, final_marker_coordinates_all, frame_stack, final_object_marker_yaw)
         reward, done = self.reward_function(self.target_angle, start_object_marker_yaw, final_object_marker_yaw)
         truncated    = False  # never truncate the episode but here for completion sake
-
         return state, reward, done, truncated
 

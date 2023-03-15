@@ -15,9 +15,9 @@ from argparse import ArgumentParser
 import TD3
 import TD3_AE
 import MemoryBuffer
-from two_finger_gripper_env import GripperEnvironment
-logging.basicConfig(level=logging.INFO)
+from Four_DoF_Environment import GripperEnvironment
 
+logging.basicConfig(level=logging.INFO)
 
 def set_seeds(seed):
     torch.manual_seed(seed)
@@ -90,7 +90,7 @@ def train(args, agent, memory, env, act_dim, file_name):
                 agent.train_policy(experiences)
 
         if (done == True) or (episode_timesteps >= args.episode_horizont):
-            logging.info(f"Total T:{total_step_counter} Episode {episode_num} was completed with {episode_timesteps} steps taken and a Reward= {episode_reward:.3f}\n")
+            logging.info(f"Total T:{total_step_counter+1} Episode {episode_num+1} was completed with {episode_timesteps} steps taken and a Reward= {episode_reward:.3f}\n")
             historical_reward["episode"].append(episode_num)
             historical_reward["reward"].append(episode_reward)
 
@@ -198,15 +198,17 @@ def parse_args():
     parser = ArgumentParser()
 
     parser.add_argument("--seed",       type=int, default=571)
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--batch_size", type=int, default=100)
 
     parser.add_argument('--agent', type=str, default='TD3')  # AE_TD3 , TD3
 
     parser.add_argument('--latent_dim',             type=int, default=50)
-    parser.add_argument("--max_steps_exploration",  type=int, default=3000)
+    parser.add_argument("--max_steps_exploration",  type=int, default=5_000)
     parser.add_argument("--max_steps_training",     type=int, default=50_000)
     parser.add_argument("--episode_horizont",       type=int, default=20)
     parser.add_argument("--max_evaluation_steps",   type=int, default=100)
+
+    parser.add_argument("--discriminate_reward", type=float, default=False)
 
     parser.add_argument("--buffer_capacity", type=int, default=1_000_000)
 
@@ -236,18 +238,20 @@ def main():
         agent = TD3_AE.TD3(device, obs_dim, act_dim)
 
     elif args.agent == "TD3":
-        train_mode = 'aruco' # servos, aruco, aruco_servos
-        logging.info("Training with TD3")
-        obs_dim = 15  # 15, 5, 19
+        logging.info("Training with Vector TD3")
+
+        train_mode = 'vector'
+        obs_dim = 15
         act_dim = args.num_motors
         agent   = TD3.TD3(device, obs_dim, act_dim)
+
     else:
         logging.info("Please select a correct learning method")
         exit()
 
-    file_name = f"{args.agent}_seed_{args.seed}_{args.robot_id}_{train_mode}"
-
+    file_name      = f"{args.agent}_seed_{args.seed}_{args.robot_id}"
     replay_buffers = MemoryBuffer.MemoryBuffer(args.buffer_capacity)
+
     env = GripperEnvironment(args.num_motors, args.camera_id, args.usb_port, train_mode)
 
     train(args, agent, replay_buffers, env, act_dim, file_name)

@@ -9,7 +9,7 @@ from argparse import ArgumentParser
 
 from TD3 import TD3
 from MemoryBuffer import MemoryBuffer
-from two_finger_gripper_env import GripperEnvironment
+from Four_DoF_Environment import GripperEnvironment
 from Plot import Plot
 
 
