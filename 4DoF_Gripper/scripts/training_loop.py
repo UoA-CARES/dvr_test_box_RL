@@ -60,6 +60,7 @@ def train(args, agent, memory, env, act_dim, file_name):
     state = env.reset()
     done  = False
 
+    episode_experiences = []
     historical_reward = {"episode": [], "reward": []}
 
     for total_step_counter in range(int(args.max_steps_training)):
@@ -79,7 +80,11 @@ def train(args, agent, memory, env, act_dim, file_name):
             #logging.info(f"Action: {action}")
 
         next_state, reward, done, _ = env.step(action)
-        memory.add(state, action, reward, next_state, done)
+        if not args.discriminate_reward:
+            memory.add(state, action, reward, next_state, done)
+        else:
+            episode_experiences.append((state, action, reward, next_state, done))
+
         state = next_state
         episode_reward += reward
 
@@ -90,9 +95,17 @@ def train(args, agent, memory, env, act_dim, file_name):
                 agent.train_policy(experiences)
 
         if (done == True) or (episode_timesteps >= args.episode_horizont):
+
             logging.info(f"Total T:{total_step_counter+1} Episode {episode_num+1} was completed with {episode_timesteps} steps taken and a Reward= {episode_reward:.3f}\n")
+
             historical_reward["episode"].append(episode_num)
             historical_reward["reward"].append(episode_reward)
+
+            if args.discriminate_reward:
+                if not episode_reward == 0.0:
+                    memory.extend(episode_experiences)
+                    logging.info(f"Buffer_size: {len(memory.buffer)}")
+                    episode_experiences = []
 
             # Reset environment
             state = env.reset()
@@ -198,17 +211,18 @@ def parse_args():
     parser = ArgumentParser()
 
     parser.add_argument("--seed",       type=int, default=571)
-    parser.add_argument("--batch_size", type=int, default=100)
+    parser.add_argument("--batch_size", type=int, default=32)
 
     parser.add_argument('--agent', type=str, default='TD3')  # AE_TD3 , TD3
 
     parser.add_argument('--latent_dim',             type=int, default=50)
-    parser.add_argument("--max_steps_exploration",  type=int, default=5_000)
+    parser.add_argument("--max_steps_exploration",  type=int, default=3_000)
     parser.add_argument("--max_steps_training",     type=int, default=50_000)
     parser.add_argument("--episode_horizont",       type=int, default=20)
     parser.add_argument("--max_evaluation_steps",   type=int, default=100)
 
-    parser.add_argument("--discriminate_reward", type=float, default=False)
+    parser.add_argument("--discriminate_reward", type=bool, default=False)
+    parser.add_argument("--motor_reset",         type=bool, default=True)
 
     parser.add_argument("--buffer_capacity", type=int, default=1_000_000)
 
@@ -218,7 +232,7 @@ def parse_args():
     parser.add_argument('--usb_port',   type=str, default='/dev/ttyUSB1')  # '/dev/ttyUSB1', '/dev/ttyUSB0'
     parser.add_argument('--robot_id',   type=str, default='RR')  # RR, RL
     parser.add_argument('--camera_id',  type=int, default=0)  # 0, 2
-    parser.add_argument('--num_motors', type=int, default=4)
+
 
     return parser.parse_args()
 
@@ -234,7 +248,7 @@ def main():
 
         train_mode = 'autoencoder'
         obs_dim = args.latent_dim  # latent dimension
-        act_dim = args.num_motors
+        act_dim = 4
         agent = TD3_AE.TD3(device, obs_dim, act_dim)
 
     elif args.agent == "TD3":
@@ -242,7 +256,7 @@ def main():
 
         train_mode = 'vector'
         obs_dim = 15
-        act_dim = args.num_motors
+        act_dim = 4
         agent   = TD3.TD3(device, obs_dim, act_dim)
 
     else:
@@ -252,7 +266,9 @@ def main():
     file_name      = f"{args.agent}_seed_{args.seed}_{args.robot_id}"
     replay_buffers = MemoryBuffer.MemoryBuffer(args.buffer_capacity)
 
-    env = GripperEnvironment(args.num_motors, args.camera_id, args.usb_port, train_mode)
+
+    #env = GripperEnvironment(args.num_motors, args.camera_id, args.usb_port, train_mode)
+    env = GripperEnvironment(args.motor_reset, args.camera_id, args.usb_port, train_mode)
 
     train(args, agent, replay_buffers, env, act_dim, file_name)
     encoder_models_evaluation(args, agent, env, device, file_name)

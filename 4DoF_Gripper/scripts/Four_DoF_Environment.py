@@ -11,7 +11,12 @@ from gripper_aruco_detector import ArucoDetector  # TODO use the lib from cares
 
 
 class GripperEnvironment:
-    def __init__(self, num_motors=4, camera_id=0, device_name="/dev/ttyUSB1", train_mode='vector', robot_id='RR'):
+    def __init__(self, motor_reset=True, camera_id=0, device_name="/dev/ttyUSB1", train_mode='vector', robot_id='RR'):
+
+        if motor_reset:
+            num_motors = 5
+        else:
+            num_motors = 4
 
         self.gripper     = Gripper(num_motors=num_motors, device_name=device_name)
         self.camera      = Camera(camera_id=camera_id, robot_id=robot_id)
@@ -57,7 +62,6 @@ class GripperEnvironment:
             else:
                 logging.info(f"New Goal Angle Generated : {self.target_angle}")
                 break
-
         state = self.define_state_space(current_servo_positions, marker_coordinates_all, frame_stack, object_marker_yaw)
         return state
 
@@ -89,7 +93,7 @@ class GripperEnvironment:
 
         if angle_difference <= self.noise_tolerance:
             logging.info("--------------------Reached the Goal Angle!-----------------")
-            reward = reward + 100
+            #reward = reward + 100
             done = True
         return reward, done
 

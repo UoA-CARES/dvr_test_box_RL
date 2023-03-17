@@ -10,6 +10,9 @@ class MemoryBuffer:
     def add(self, *experience):
         self.buffer.append(experience)
 
+    def extend(self, experience):
+        self.buffer.extend(experience)
+
     def sample(self, batch_size):
         experience_batch = random.sample(self.buffer, batch_size)
         states, actions, rewards, next_states, dones = zip(*experience_batch)

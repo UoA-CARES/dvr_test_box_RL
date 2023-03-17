@@ -50,17 +50,20 @@ class Gripper(object):
         self.group_sync_read  = dxl.GroupSyncRead(self.port_handler, self.packet_handler, Servo.addresses["current_position"], 2)
 
         self.servos = {}
-        self.num_motors = num_motors
 
-        leds = [1, 2, 3, 4]
+        if num_motors == 4:
+            leds = [1, 2, 3, 4]
+            min  = [410, 200, 550, 500]
+            max  = [460, 500, 600, 800]
 
-        #min  = [300, 300, 300, 300]
-        #max  = [700, 700, 700, 700]
-        min  = [370, 200, 540, 500]
-        max  = [470, 500, 640, 800]
+        elif num_motors == 5:
+            leds = [1, 2, 3, 4, 5]
+            min  = [410, 200, 550, 500, 1]
+            max  = [460, 500, 600, 800, 1023]
+
 
         try:
-            for i in range(0, self.num_motors):
+            for i in range(0, num_motors):
                 self.servos[i] = Servo(self.port_handler, self.packet_handler, leds[i], i + 1, torque_limit, speed_limit, max[i], min[i])
             self.setup_servos()
         except DynamixelServoError as error:
@@ -146,10 +149,14 @@ class Gripper(object):
 
     @backoff.on_exception(backoff.expo, DynamixelServoError, jitter=None, giveup=handle_gripper_error)
     def move(self, steps, wait=True, timeout=3):
+
         if not self.verify_steps(steps):
             error_message = f"Gripper#{self.gripper_id}: The move command provided is out of bounds: Step {steps}"
             logging.error(error_message)
             raise DynamixelServoError(error_message)
+
+        print(steps)
+        print(len(steps))
 
         for id, servo in self.servos.items():
             servo.target_position = steps[id]
@@ -178,7 +185,7 @@ class Gripper(object):
 
     def home(self):
         try:
-            home_pose = [370, 300, 640, 650]
+            home_pose = [410, 300, 600, 700, 300]
             return self.move(home_pose)
         except DynamixelServoError as error:
             raise DynamixelServoError(f"Gripper#{self.gripper_id}: failed to Home") from error
