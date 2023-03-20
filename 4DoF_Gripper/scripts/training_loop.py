@@ -222,7 +222,7 @@ def parse_args():
     parser.add_argument("--max_evaluation_steps",   type=int, default=100)
 
     parser.add_argument("--discriminate_reward",    default=True)
-    parser.add_argument("--motor_reset_on",  type=str,  default="On")
+    parser.add_argument("--motor_reset",  type=str,  default="On")
 
     parser.add_argument("--buffer_capacity", type=int, default=1_000_000)
 
@@ -264,15 +264,15 @@ def main():
         logging.info("Please select a correct learning method")
         exit()
 
-    file_name      = f"{args.agent}_seed_{args.seed}_{args.robot_id}_motor_reset_{args.motor_reset_on}"
+    file_name      = f"{args.agent}_seed_{args.seed}_{args.robot_id}_motor_reset_{args.motor_reset}"
     replay_buffers = MemoryBuffer.MemoryBuffer(args.buffer_capacity)
 
 
-    env = GripperEnvironment(num_motors=args.num_motors, motor_reset=args.motor_reset_on, camera_id=args.camera_id, device_name=args.usb_port, train_mode=train_mode)
+    env = GripperEnvironment(num_motors=args.num_motors, motor_reset=args.motor_reset, camera_id=args.camera_id, device_name=args.usb_port, train_mode=train_mode)
 
     train(args, agent, replay_buffers, env, act_dim, file_name)
-    encoder_models_evaluation(args, agent, env, device, file_name)
-    agent_models_evaluation(args, agent, env, device, file_name)
+    #encoder_models_evaluation(args, agent, env, device, file_name)
+    #agent_models_evaluation(args, agent, env, device, file_name)
 
 
 if __name__ == '__main__':

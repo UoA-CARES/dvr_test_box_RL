@@ -12,6 +12,7 @@ from gripper_aruco_detector import ArucoDetector  # TODO use the lib from cares
 
 class GripperEnvironment:
     def __init__(self, num_motors=4,  motor_reset=True, camera_id=0, device_name="/dev/ttyUSB1", train_mode='vector', robot_id='RR'):
+
         self.gripper     = Gripper(num_motors=num_motors, device_name=device_name, motor_reset=motor_reset)
         self.camera      = Camera(camera_id=camera_id, robot_id=robot_id)
         self.frame_stack = FrameStack()
@@ -29,7 +30,6 @@ class GripperEnvironment:
     def reset(self):
         try:
             current_servo_positions = self.gripper.home()
-
         except GripperError as error:
             logging.error(error)
             exit()
@@ -90,7 +90,7 @@ class GripperEnvironment:
 
         if angle_difference <= self.noise_tolerance:
             logging.info("--------------------Reached the Goal Angle!-----------------")
-            #reward = reward + 100
+            reward = reward + 100
             done = True
         return reward, done
 
@@ -157,6 +157,8 @@ class GripperEnvironment:
 
         final_marker_pose_all   = self.find_marker_pose(marker_ids_vector=self.marker_ids_vector)
         final_object_marker_yaw = final_marker_pose_all[self.object_marker_id][1][2]
+
+        logging.info(f"Current Yaw object: {final_object_marker_yaw:.3f}")
 
         if self.train_mode == 'autoencoder':
             final_marker_coordinates_all = None

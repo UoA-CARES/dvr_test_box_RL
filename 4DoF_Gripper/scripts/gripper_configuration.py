@@ -33,8 +33,8 @@ class Gripper(object):
                  device_name="/dev/ttyUSB1",
                  baudrate=1000000,
                  protocol=2.0,
-                 torque_limit=210,
-                 speed_limit=210):
+                 torque_limit=280,
+                 speed_limit=280):
 
         self.motor_reset = motor_reset
 
@@ -54,11 +54,11 @@ class Gripper(object):
 
         self.group_sync_write_reset = dxl.GroupSyncWrite(self.port_handler, self.packet_handler, Servo.addresses["goal_position"], 2)
 
+
         self.servos = {}
         leds = [1, 2, 3, 4]
         min  = [440, 260, 500, 510]
         max  = [500, 510, 580, 760]
-
 
 
         if self.motor_reset == "On":
@@ -68,13 +68,13 @@ class Gripper(object):
                 self.setup_motor_reset()
             except DynamixelServoError as error:
                 raise DynamixelServoError(f"Gripper#{self.gripper_id}: Failed to initialise reset motor") from error
-        else:
-            try:
-                for i in range(0, num_motors):
-                    self.servos[i] = Servo(self.port_handler, self.packet_handler, leds[i], i + 1, torque_limit, speed_limit, max[i], min[i])
-                self.setup_servos()
-            except DynamixelServoError as error:
-                raise DynamixelServoError(f"Gripper#{self.gripper_id}: Failed to initialise servos") from error
+
+        try:
+            for i in range(0, num_motors):
+                self.servos[i] = Servo(self.port_handler, self.packet_handler, leds[i], i + 1, torque_limit, speed_limit, max[i], min[i])
+            self.setup_servos()
+        except DynamixelServoError as error:
+            raise DynamixelServoError(f"Gripper#{self.gripper_id}: Failed to initialise servos") from error
 
 
     def setup_handlers(self):
@@ -175,6 +175,7 @@ class Gripper(object):
             logging.error(error_message)
             raise DynamixelServoError(error_message)
 
+
         for id, servo in self.servos.items():
             servo.target_position = steps[id]
             self.group_sync_write.addParam(id + 1, [dxl.DXL_LOBYTE(steps[id]), dxl.DXL_HIBYTE(steps[id])])
@@ -184,6 +185,7 @@ class Gripper(object):
             error_message = f"Gripper#{self.gripper_id}: group_sync_write Failed"
             logging.error(error_message)
             raise DynamixelServoError(error_message)
+
 
         logging.debug(f"Gripper#{self.gripper_id}: group_sync_write Succeeded")
         self.group_sync_write.clearParam()
@@ -207,7 +209,7 @@ class Gripper(object):
             current_positions = self.move(home_pose)
 
             if self.motor_reset == "On":
-                servo_reset_home_step = 510
+                servo_reset_home_step = 440
                 self.move_motor_reset(servo_reset_home_step)
 
             return current_positions
