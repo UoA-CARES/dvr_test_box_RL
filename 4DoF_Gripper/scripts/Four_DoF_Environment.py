@@ -11,14 +11,8 @@ from gripper_aruco_detector import ArucoDetector  # TODO use the lib from cares
 
 
 class GripperEnvironment:
-    def __init__(self, motor_reset=True, camera_id=0, device_name="/dev/ttyUSB1", train_mode='vector', robot_id='RR'):
-
-        if motor_reset:
-            num_motors = 5
-        else:
-            num_motors = 4
-
-        self.gripper     = Gripper(num_motors=num_motors, device_name=device_name)
+    def __init__(self, num_motors=4,  motor_reset=True, camera_id=0, device_name="/dev/ttyUSB1", train_mode='vector', robot_id='RR'):
+        self.gripper     = Gripper(num_motors=num_motors, device_name=device_name, motor_reset=motor_reset)
         self.camera      = Camera(camera_id=camera_id, robot_id=robot_id)
         self.frame_stack = FrameStack()
 
@@ -35,6 +29,7 @@ class GripperEnvironment:
     def reset(self):
         try:
             current_servo_positions = self.gripper.home()
+
         except GripperError as error:
             logging.error(error)
             exit()
@@ -67,16 +62,18 @@ class GripperEnvironment:
 
 
     def choose_target_angle(self):
-        #return np.random.randint(low=0, high=360)
-        target_angle = np.random.randint(1, 5)
-        if target_angle == 1:
-            return 90
-        elif target_angle == 2:
-            return 180
-        elif target_angle == 3:
-            return 270
-        elif target_angle == 4:
-            return 0
+        # return np.random.randint(low=0, high=360)
+        # target_angle = np.random.randint(1, 5)
+        # if target_angle == 1:
+        #     return 90
+        # elif target_angle == 2:
+        #     return 180
+        # elif target_angle == 3:
+        #     return 270
+        # elif target_angle == 4:
+        #     return 0
+        return 180
+
 
     def reward_function(self, target_angle, start_marker_pose, final_marker_pose):
         done = False

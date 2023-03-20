@@ -218,11 +218,11 @@ def parse_args():
     parser.add_argument('--latent_dim',             type=int, default=50)
     parser.add_argument("--max_steps_exploration",  type=int, default=3_000)
     parser.add_argument("--max_steps_training",     type=int, default=50_000)
-    parser.add_argument("--episode_horizont",       type=int, default=20)
+    parser.add_argument("--episode_horizont",       type=int, default=30)
     parser.add_argument("--max_evaluation_steps",   type=int, default=100)
 
-    parser.add_argument("--discriminate_reward", type=bool, default=False)
-    parser.add_argument("--motor_reset",         type=bool, default=True)
+    parser.add_argument("--discriminate_reward",    default=True)
+    parser.add_argument("--motor_reset_on",  type=str,  default="On")
 
     parser.add_argument("--buffer_capacity", type=int, default=1_000_000)
 
@@ -232,6 +232,7 @@ def parse_args():
     parser.add_argument('--usb_port',   type=str, default='/dev/ttyUSB1')  # '/dev/ttyUSB1', '/dev/ttyUSB0'
     parser.add_argument('--robot_id',   type=str, default='RR')  # RR, RL
     parser.add_argument('--camera_id',  type=int, default=0)  # 0, 2
+    parser.add_argument('--num_motors',  type=int, default=4)
 
 
     return parser.parse_args()
@@ -263,12 +264,11 @@ def main():
         logging.info("Please select a correct learning method")
         exit()
 
-    file_name      = f"{args.agent}_seed_{args.seed}_{args.robot_id}"
+    file_name      = f"{args.agent}_seed_{args.seed}_{args.robot_id}_motor_reset_{args.motor_reset_on}"
     replay_buffers = MemoryBuffer.MemoryBuffer(args.buffer_capacity)
 
 
-    #env = GripperEnvironment(args.num_motors, args.camera_id, args.usb_port, train_mode)
-    env = GripperEnvironment(args.motor_reset, args.camera_id, args.usb_port, train_mode)
+    env = GripperEnvironment(num_motors=args.num_motors, motor_reset=args.motor_reset_on, camera_id=args.camera_id, device_name=args.usb_port, train_mode=train_mode)
 
     train(args, agent, replay_buffers, env, act_dim, file_name)
     encoder_models_evaluation(args, agent, env, device, file_name)
