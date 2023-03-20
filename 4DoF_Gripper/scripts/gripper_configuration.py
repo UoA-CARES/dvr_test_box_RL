@@ -27,7 +27,7 @@ class GripperError(IOError):
 
 class Gripper(object):
     def __init__(self,
-                 motor_reset="On",
+                 motor_reset=True,
                  num_motors=4,
                  gripper_id=0,
                  device_name="/dev/ttyUSB1",
@@ -61,7 +61,8 @@ class Gripper(object):
         max  = [500, 510, 580, 760]
 
 
-        if self.motor_reset == "On":
+        if self.motor_reset:
+            print(type(self.motor_reset),"-------------------------------")
             try:
                 motor_id_reset = 5
                 self.reset_motor = Servo(self.port_handler, self.packet_handler, 5, motor_id_reset, torque_limit, speed_limit, 1023, 0)
