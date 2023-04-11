@@ -78,60 +78,61 @@ class AE_TD3:
         rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
         dones   = dones.unsqueeze(0).reshape(batch_size, 1)
 
-        with torch.no_grad():
-            next_actions = self.actor_target_net(next_states)
-            target_noise = 0.2 * torch.randn_like(next_actions)
-            target_noise = torch.clamp(target_noise, -0.5, 0.5)
-            next_actions = next_actions + target_noise
-            next_actions = torch.clamp(next_actions, min=-1, max=1)
 
-            target_q_values_one, target_q_values_two = self.critic_target_net(next_states, next_actions)
-            target_q_values = torch.minimum(target_q_values_one, target_q_values_two)
-
-            q_target = rewards + self.gamma * (1 - dones) * target_q_values
-
-        q_values_one, q_values_two = self.critic_net(states, actions)
-
-        critic_loss_1 = F.mse_loss(q_values_one, q_target)
-        critic_loss_2 = F.mse_loss(q_values_two, q_target)
-        critic_loss_total = critic_loss_1 + critic_loss_2
-
-        # Update the Critic
-        self.critic_net.optimiser.zero_grad()
-        critic_loss_total.backward()
-        self.critic_net.optimiser.step()
-
-        # Update Actor
-        if self.learn_counter % self.policy_update_freq == 0:
-            actor_q_one, actor_q_two = self.critic_net(states, self.actor_net(states))
-            actor_q_values = torch.minimum(actor_q_one, actor_q_two)
-            actor_loss = -actor_q_values.mean()
-
-            self.actor_net.optimiser.zero_grad()
-            actor_loss.backward()
-            self.actor_net.optimiser.step()
-
-            # Update target network params
-            for target_param, param in zip(self.critic_target_net.parameters(), self.critic_net.parameters()):
-                target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
-
-            for target_param, param in zip(self.actor_target_net.parameters(), self.actor_net.parameters()):
-                target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
-
-        # Update Autoencoder
-        z_vector = self.critic_net.encoder_net(states)
-        rec_obs  = self.decoder_net(z_vector)
-
-        rec_loss    = F.mse_loss(states, rec_obs)
-        latent_loss = (0.5 * z_vector.pow(2).sum(1)).mean()  # add L2 penalty on latent representation
-
-        ae_loss = rec_loss + 1e-6 * latent_loss
-
-        self.critic_net.encoder_optimizer.zero_grad()  # todo look wha to do with this
-        self.decoder_net.optimizer.zero_grad()
-        ae_loss.backward()
-        self.critic_net.encoder_optimizer.step()
-        self.decoder_net.optimizer.step()
+        # with torch.no_grad():
+        #     next_actions = self.actor_target_net(next_states)
+        #     target_noise = 0.2 * torch.randn_like(next_actions)
+        #     target_noise = torch.clamp(target_noise, -0.5, 0.5)
+        #     next_actions = next_actions + target_noise
+        #     next_actions = torch.clamp(next_actions, min=-1, max=1)
+        #
+        #     target_q_values_one, target_q_values_two = self.critic_target_net(next_states, next_actions)
+        #     target_q_values = torch.minimum(target_q_values_one, target_q_values_two)
+        #
+        #     q_target = rewards + self.gamma * (1 - dones) * target_q_values
+        #
+        # q_values_one, q_values_two = self.critic_net(states, actions)
+        #
+        # critic_loss_1 = F.mse_loss(q_values_one, q_target)
+        # critic_loss_2 = F.mse_loss(q_values_two, q_target)
+        # critic_loss_total = critic_loss_1 + critic_loss_2
+        #
+        # # Update the Critic
+        # self.critic_net.optimiser.zero_grad()
+        # critic_loss_total.backward()
+        # self.critic_net.optimiser.step()
+        #
+        # # Update Actor
+        # if self.learn_counter % self.policy_update_freq == 0:
+        #     actor_q_one, actor_q_two = self.critic_net(states, self.actor_net(states))
+        #     actor_q_values = torch.minimum(actor_q_one, actor_q_two)
+        #     actor_loss = -actor_q_values.mean()
+        #
+        #     self.actor_net.optimiser.zero_grad()
+        #     actor_loss.backward()
+        #     self.actor_net.optimiser.step()
+        #
+        #     # Update target network params
+        #     for target_param, param in zip(self.critic_target_net.parameters(), self.critic_net.parameters()):
+        #         target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
+        #
+        #     for target_param, param in zip(self.actor_target_net.parameters(), self.actor_net.parameters()):
+        #         target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
+        #
+        # # Update Autoencoder
+        # z_vector = self.critic_net.encoder_net(states)
+        # rec_obs  = self.decoder_net(z_vector)
+        #
+        # rec_loss    = F.mse_loss(states, rec_obs)
+        # latent_loss = (0.5 * z_vector.pow(2).sum(1)).mean()  # add L2 penalty on latent representation
+        #
+        # ae_loss = rec_loss + 1e-6 * latent_loss
+        #
+        # self.critic_net.encoder_optimizer.zero_grad()  # todo look wha to do with this
+        # self.decoder_net.optimizer.zero_grad()
+        # ae_loss.backward()
+        # self.critic_net.encoder_optimizer.step()
+        # self.decoder_net.optimizer.step()
 
 
 
