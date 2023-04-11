@@ -18,8 +18,9 @@ from FrameStack import FrameStack
 
 
 def train(env, agent):
-    max_steps_training    = 5000
-    max_steps_exploration = 500
+
+    max_steps_training    = 50_000
+    max_steps_exploration = 3000
     batch_size            = 32
 
     seed = 232
@@ -59,14 +60,9 @@ def train(env, agent):
         episode_reward += reward
 
         if total_step_counter >= max_steps_exploration:
-            experiences = memory.sample(batch_size)
-            agent.train_policy(experiences)
-
-
-        # if total_step_counter >= max_steps_exploration:
-        #     for _ in range(G):
-        #         experiences = memory.sample(batch_size)
-        #         agent.train_policy(experiences)
+            for _ in range(G):
+                experiences = memory.sample(batch_size)
+                agent.train_policy(experiences)
 
         if done or truncated:
             logging.info(f"Total T:{total_step_counter + 1} Episode {episode_num + 1} was completed with {episode_timesteps} steps taken and a Reward= {episode_reward:.3f}")
@@ -92,6 +88,7 @@ def main():
 
     lr_actor   = 1e-3
     lr_critic  = 1e-4
+
     lr_decoder = 1e-3
     lr_encoder = 1e-3
 
@@ -99,7 +96,7 @@ def main():
     tau   = 0.005
 
     actor_net   = Actor(latent_size, action_size, lr_actor)
-    critic_net  = Critic(latent_size, action_size, lr_critic)
+    critic_net  = Critic(latent_size, action_size, lr_critic, lr_encoder)
     decoder_net = Decoder(latent_size, lr_decoder)
 
     agent = AE_TD3(

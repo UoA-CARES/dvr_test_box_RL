@@ -1,11 +1,11 @@
-
 import torch
-import torch.optim as optim
 import torch.nn as nn
+import torch.optim as optim
 
+from networks.weight_initialization import weight_init
 
 class Decoder(nn.Module):
-    def __init__(self, latent_dim, learning_rate, k =3):
+    def __init__(self, latent_dim, learning_rate, k=3):
 
         super(Decoder, self).__init__()
         self.num_filters = 32
@@ -24,8 +24,8 @@ class Decoder(nn.Module):
             nn.Sigmoid(),  # original paper no use activation function here. I added it and helps
         )
 
-        #self.apply(weight_init)
-        self.optimiser = optim.Adam(self.parameters(), lr=learning_rate)
+        self.apply(weight_init)
+        self.optimiser = optim.Adam(self.parameters(), lr=learning_rate, weight_decay=1e-7)
 
 
     def forward(self, x):

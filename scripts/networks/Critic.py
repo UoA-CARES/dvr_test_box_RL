@@ -5,9 +5,11 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 from networks.Encoder import Encoder
+from networks.weight_initialization import weight_init
+
 
 class Critic(nn.Module):
-    def __init__(self, latent_size, num_actions, learning_rate):
+    def __init__(self, latent_size, num_actions, learning_rate, encoder_learning_rate):
         super(Critic, self).__init__()
 
         self.encoder_net  = Encoder(latent_size)
@@ -23,10 +25,10 @@ class Critic(nn.Module):
         self.h_linear_22 = nn.Linear(self.hidden_size[0], self.hidden_size[1])
         self.h_linear_32 = nn.Linear(self.hidden_size[1], 1)
 
-        self.optimiser = optim.Adam(self.parameters(), lr=learning_rate)
-        #self.encoder_optimizer = torch.optim.Adam(self.encoder_net.parameters(), lr=encoder_lr) # todo no estoy seguro de esto aqui
+        self.optimiser         = optim.Adam(self.parameters(), lr=learning_rate)
+        self.encoder_optimiser = optim.Adam(self.encoder_net.parameters(), lr=encoder_learning_rate)
 
-        #self.apply(weight_init)
+        self.apply(weight_init)
 
     def forward(self, state, action, detach_encoder=False):
         z_vector = self.encoder_net(state, detach=detach_encoder)

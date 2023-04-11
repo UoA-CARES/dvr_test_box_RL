@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+from networks.weight_initialization import weight_init
+
 
 def tie_weights(src, trg):
     assert type(src) == type(trg)
@@ -22,7 +24,7 @@ class Encoder(nn.Module):
         self.fc = nn.Linear(39200, self.latent_dim)
         self.ln = nn.LayerNorm(self.latent_dim)
 
-        #self.encoder_optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate) # todo no estoy seguro de esto aqui
+        self.apply(weight_init)
 
 
     def forward_conv(self, x):
@@ -50,5 +52,3 @@ class Encoder(nn.Module):
             tie_weights(src=model_source.cov_net[i], trg=self.cov_net[i])
         tie_weights(src=model_source.fc, trg=self.fc)
         #tie_weights(src=model_source.ln, trg=self.ln)
-
-
