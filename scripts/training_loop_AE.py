@@ -18,7 +18,7 @@ from FrameStack import FrameStack
 
 def train(env, agent):
     max_steps_training    = 50_000
-    max_steps_exploration = 10_000
+    max_steps_exploration = 1_000
     batch_size            = 32
 
     seed = 232
@@ -108,7 +108,7 @@ def main():
         device=device,
     )
 
-    #train(env, agent)
+    train(env, agent)
 
 
 if __name__ == '__main__':

@@ -44,6 +44,12 @@ class AE_TD3:
 
         self.decoder_net = decoder_network.to(device)
 
+        self.actor_net.train(True)
+        self.critic_net.train(True)
+        self.critic_target_net.train(True)
+        self.actor_target_net.train(True)
+        self.decoder_net.train(True)
+
 
 
     def get_action_from_policy(self, state, evaluation=False, noise_scale=0.1):
@@ -73,7 +79,8 @@ class AE_TD3:
         actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
         rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
         next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
-        dones = torch.LongTensor(np.asarray(dones)).to(self.device)
+        #dones = torch.LongTensor(np.asarray(dones)).to(self.device)
+        dones = torch.FloatTensor(np.asarray(dones)).to(self.device)
 
         # Reshape to batch_size
         rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
@@ -133,3 +140,4 @@ class AE_TD3:
         ae_loss.backward()
         self.critic_net.encoder_optimiser.step()
         self.decoder_net.optimiser.step()
+
