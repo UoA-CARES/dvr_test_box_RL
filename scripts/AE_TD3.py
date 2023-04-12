@@ -9,6 +9,7 @@ import numpy as np
 
 import torch
 import torch.nn.functional as F
+from cares_reinforcement_learning.util import helpers as hlp
 
 
 class AE_TD3:
@@ -37,18 +38,12 @@ class AE_TD3:
         # tie encoders between actor and critic, with this, any changes in the critic encoder
         # will also be affecting the actor-encoder during the WHOLE training
         self.actor_net.encoder_net.copy_conv_weights_from(self.critic_net.encoder_net)
-        #self.actor_net.encoder_net.copy_all_weights_from(self.critic_net.encoder_net)
 
         self.actor_target_net  = copy.deepcopy(self.actor_net).to(device)
         self.critic_target_net = copy.deepcopy(self.critic_net).to(device)
 
         self.decoder_net = decoder_network.to(device)
 
-        self.actor_net.train(True)
-        self.critic_net.train(True)
-        self.critic_target_net.train(True)
-        self.actor_target_net.train(True)
-        self.decoder_net.train(True)
 
 
     def get_action_from_policy(self, state, evaluation=False, noise_scale=0.1):
@@ -109,7 +104,7 @@ class AE_TD3:
 
         # Update Actor
         if self.learn_counter % self.policy_update_freq == 0:
-            actor_q_one, actor_q_two = self.critic_net(states, self.actor_net(states))
+            actor_q_one, actor_q_two = self.critic_net(states, self.actor_net(states, detach_encoder=True),  detach_encoder=True)
             actor_q_values = torch.minimum(actor_q_one, actor_q_two)
             actor_loss = -actor_q_values.mean()
 

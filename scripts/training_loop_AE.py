@@ -1,9 +1,8 @@
+
 import gym
 import torch
 import logging
 logging.basicConfig(level=logging.INFO)
-import numpy as np
-import matplotlib.pyplot as plt
 
 from cares_reinforcement_learning.util import MemoryBuffer
 from cares_reinforcement_learning.util import helpers as hlp
@@ -47,14 +46,15 @@ def train(env, agent):
             logging.info(f"Running Exploration Steps {total_step_counter}/{max_steps_exploration}")
             action_env = env.action_space.sample()  # action range the env uses [e.g. -2 , 2 for pendulum]
             action     = hlp.normalize(action_env, max_action_value, min_action_value)  # algorithm range [-1, 1]
+
         else:
             action     = agent.get_action_from_policy(state)
             action_env = hlp.denormalize(action, max_action_value, min_action_value)
 
         next_state, reward, done, truncated, info = frames_stack.step(action_env)
         memory.add(state=state, action=action, reward=reward, next_state=next_state, done=done)
-
         state = next_state
+
         episode_reward += reward
 
         if total_step_counter >= max_steps_exploration:
@@ -108,7 +108,7 @@ def main():
         device=device,
     )
 
-    train(env, agent)
+    #train(env, agent)
 
 
 if __name__ == '__main__':
