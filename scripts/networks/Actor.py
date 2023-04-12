@@ -19,13 +19,13 @@ class Actor(nn.Module):
         self.h_linear_2 = nn.Linear(in_features=self.hidden_size[0], out_features=self.hidden_size[1])
         self.h_linear_3 = nn.Linear(in_features=self.hidden_size[1], out_features=num_actions)
 
-        self.optimiser = optim.Adam(self.parameters(), lr=learning_rate)
         self.apply(weight_init)
+        self.optimiser = optim.Adam(self.parameters(), lr=learning_rate)
+
 
     def forward(self, state, detach_encoder=False):
         z_vector = self.encoder_net(state, detach=detach_encoder)
-
-        output = F.relu(self.h_linear_1(z_vector))
-        output = F.relu(self.h_linear_2(output))
-        output = torch.tanh(self.h_linear_3(output))
+        output   = F.relu(self.h_linear_1(z_vector))
+        output   = F.relu(self.h_linear_2(output))
+        output   = torch.tanh(self.h_linear_3(output))
         return output

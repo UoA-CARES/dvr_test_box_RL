@@ -18,9 +18,8 @@ from FrameStack import FrameStack
 
 
 def train(env, agent):
-
     max_steps_training    = 50_000
-    max_steps_exploration = 3000
+    max_steps_exploration = 10_000
     batch_size            = 32
 
     seed = 232
@@ -48,7 +47,6 @@ def train(env, agent):
             logging.info(f"Running Exploration Steps {total_step_counter}/{max_steps_exploration}")
             action_env = env.action_space.sample()  # action range the env uses [e.g. -2 , 2 for pendulum]
             action     = hlp.normalize(action_env, max_action_value, min_action_value)  # algorithm range [-1, 1]
-
         else:
             action     = agent.get_action_from_policy(state)
             action_env = hlp.denormalize(action, max_action_value, min_action_value)

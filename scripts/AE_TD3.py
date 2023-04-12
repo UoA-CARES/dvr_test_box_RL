@@ -1,14 +1,15 @@
+
 """
 This is my version and  re-implementation of the paper  https://arxiv.org/pdf/1910.01741.pdf
 I removed and changed many part here from the original implementation for example the original paper use SAC
 """
-
 
 import copy
 import numpy as np
 
 import torch
 import torch.nn.functional as F
+
 
 class AE_TD3:
     def __init__(self,
@@ -35,7 +36,6 @@ class AE_TD3:
 
         # tie encoders between actor and critic, with this, any changes in the critic encoder
         # will also be affecting the actor-encoder during the WHOLE training
-
         self.actor_net.encoder_net.copy_conv_weights_from(self.critic_net.encoder_net)
         #self.actor_net.encoder_net.copy_all_weights_from(self.critic_net.encoder_net)
 
@@ -44,9 +44,15 @@ class AE_TD3:
 
         self.decoder_net = decoder_network.to(device)
 
+        self.actor_net.train(True)
+        self.critic_net.train(True)
+        self.critic_target_net.train(True)
+        self.actor_target_net.train(True)
+        self.decoder_net.train(True)
+
 
     def get_action_from_policy(self, state, evaluation=False, noise_scale=0.1):
-        self.actor_net.eval()
+        #self.actor_net.eval()
         with torch.no_grad():
             state_tensor = torch.FloatTensor(state).to(self.device)
             state_tensor = state_tensor.unsqueeze(0)
@@ -57,7 +63,7 @@ class AE_TD3:
                 noise  = np.random.normal(0, scale=noise_scale, size=self.action_num)
                 action = action + noise
                 action = np.clip(action, -1, 1)
-        self.actor_net.train()
+        #self.actor_net.train()
         return action
 
 

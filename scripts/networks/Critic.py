@@ -25,10 +25,10 @@ class Critic(nn.Module):
         self.h_linear_22 = nn.Linear(self.hidden_size[0], self.hidden_size[1])
         self.h_linear_32 = nn.Linear(self.hidden_size[1], 1)
 
+        self.apply(weight_init)
         self.optimiser         = optim.Adam(self.parameters(), lr=learning_rate)
         self.encoder_optimiser = optim.Adam(self.encoder_net.parameters(), lr=encoder_learning_rate)
 
-        self.apply(weight_init)
 
     def forward(self, state, action, detach_encoder=False):
         z_vector = self.encoder_net(state, detach=detach_encoder)
