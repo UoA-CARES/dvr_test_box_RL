@@ -71,7 +71,8 @@ class RLAgent:
         # tie encoders between actor and critic
         # with this, any changes in the critic encoder
         # will also be affecting the actor-encoder during the whole training
-        self.actor.encoder_net.copy_conv_weights_from(self.critic.encoder_net)
+        #self.actor.encoder_net.copy_conv_weights_from(self.critic.encoder_net)
+        self.actor.encoder_net.copy_all_weights_from(self.critic.encoder_net)
 
         # copy weights and bias from main to target networks
         self.critic_target.load_state_dict(self.critic.state_dict())
@@ -252,7 +253,7 @@ def run_random_exploration(env, agent, frames_stack, num_exploration_episodes, e
         state_image = frames_stack.reset()
         for step in range(1, episode_horizont + 1):
             action = env.action_space.sample()
-            new_state_image, reward, done, _ = frames_stack.step(action)
+            new_state_image, reward, done, _, _ = frames_stack.step(action)
             agent.memory.save_experience_to_buffer(state_image, action, reward, new_state_image, done)
             state_image = new_state_image
             if done:
@@ -272,7 +273,7 @@ def run_training_rl_method(env, agent, max_action_value, env_name, frames_stack,
             noise  = np.random.normal(0, scale=0.1 * max_action_value, size=env.action_space.shape[0])
             action = action + noise
             action = np.clip(action, -max_action_value, max_action_value)
-            new_state_image, reward, done, _ = frames_stack.step(action)
+            new_state_image, reward, done, _, _ = frames_stack.step(action)
             agent.memory.save_experience_to_buffer(state_image, action, reward, new_state_image, done)
             state_image = new_state_image
             episode_reward += reward
@@ -335,7 +336,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     args   = define_parse_args()
 
-    env      = gym.make(args.env_name)
+    env      = gym.make(args.env_name, render_mode="rgb_array")
     env_name = args.env_name
     max_action_value = env.action_space.high.max()  # --> 2 for pendulum, 1 for Walker
 
@@ -350,7 +351,7 @@ def main():
         episode_horizont         = 1600
         memory_size              = 200_000 # 320_000
 
-    env.seed(args.seed)
+    #env.seed(args.seed)
     env.action_space.seed(args.seed)
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -360,8 +361,8 @@ def main():
 
     run_random_exploration(env, agent, frames_stack, num_exploration_episodes=num_exploration_episodes, episode_horizont=episode_horizont)
     run_training_rl_method(env, agent, max_action_value, env_name, frames_stack, num_episodes_training=num_training_episodes, episode_horizont=episode_horizont)
-    autoencoder_evaluation(agent, frames_stack, env_name, device)
-    policy_env_evaluation_function(agent, env, frames_stack)
+    #autoencoder_evaluation(agent, frames_stack, env_name, device)
+    #policy_env_evaluation_function(agent, env, frames_stack)
     env.close()
 
 

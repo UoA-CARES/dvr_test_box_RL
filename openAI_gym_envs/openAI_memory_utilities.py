@@ -56,7 +56,7 @@ class FrameStack:
 
     def reset(self):
         self.env.reset()
-        obs = self.env.render(mode='rgb_array')
+        obs = self.env.render()
         obs = self.preprocessing_image(obs)
         for _ in range(self.k):
             self.frames_stacked.append(obs)
@@ -65,13 +65,13 @@ class FrameStack:
         return stacked_vector
 
     def step(self, action):
-        _, reward, done, info = self.env.step(action)
-        obs = self.env.render(mode='rgb_array')
+        _, reward, done, truncated, info = self.env.step(action)
+        obs = self.env.render()
         obs = self.preprocessing_image(obs)
         self.frames_stacked.append(obs)
         stacked_vector = np.array(list(self.frames_stacked))
         # stacked_vector = np.concatenate(list(self.frames_stacked), axis=0)
-        return stacked_vector, reward, done, info
+        return stacked_vector, reward, done, truncated, info
 
     def preprocessing_image(self, image_array):
         resized    = cv2.resize(image_array, (84, 84), interpolation=cv2.INTER_AREA)

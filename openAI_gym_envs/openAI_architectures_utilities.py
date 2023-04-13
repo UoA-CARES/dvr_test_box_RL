@@ -125,6 +125,13 @@ class Encoder(nn.Module):
         for i in range(self.num_layers):
             tie_weights(src=model_source.cov_net[i], trg=self.cov_net[i])
 
+    def copy_all_weights_from(self, model_source):
+        for i in range(self.num_layers):
+            tie_weights(src=model_source.cov_net[i], trg=self.cov_net[i])
+        tie_weights(src=model_source.fc, trg=self.fc)
+        #tie_weights(src=model_source.ln, trg=self.ln)
+
+
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
