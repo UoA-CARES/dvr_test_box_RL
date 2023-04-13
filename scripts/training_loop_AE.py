@@ -96,6 +96,7 @@ def main():
     critic_net  = Critic(latent_size, action_size)
     decoder_net = Decoder(latent_size)
 
+
     agent = AE_TD3(
         actor_network=actor_net,
         critic_network=critic_net,
