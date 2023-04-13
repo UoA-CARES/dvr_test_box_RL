@@ -9,7 +9,7 @@ from networks.weight_initialization import weight_init
 
 
 class Critic(nn.Module):
-    def __init__(self, latent_size, num_actions, learning_rate, encoder_learning_rate):
+    def __init__(self, latent_size, num_actions):
         super(Critic, self).__init__()
 
         self.encoder_net  = Encoder(latent_size)
@@ -26,8 +26,8 @@ class Critic(nn.Module):
         self.h_linear_32 = nn.Linear(self.hidden_size[1], 1)
 
         self.apply(weight_init)
-        #self.optimiser         = optim.Adam(self.parameters(), lr=learning_rate)
-        #self.encoder_optimiser = optim.Adam(self.encoder_net.parameters(), lr=encoder_learning_rate)
+        #self.optimiser = optim.Adam(self.parameters(), lr=learning_rate)
+
 
 
     def forward(self, state, action, detach_encoder=False):

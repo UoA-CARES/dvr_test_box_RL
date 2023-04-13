@@ -9,7 +9,7 @@ import numpy as np
 
 import torch
 import torch.nn.functional as F
-from cares_reinforcement_learning.util import helpers as hlp
+
 
 
 class AE_TD3:
@@ -21,6 +21,10 @@ class AE_TD3:
                  tau,
                  action_num,
                  latent_size,
+                 lr_actor,
+                 lr_critic,
+                 lr_decoder,
+                 lr_encoder,
                  device):
 
         self.device = device
@@ -44,25 +48,11 @@ class AE_TD3:
 
         self.decoder_net = decoder_network.to(device)
 
-
-        self.encoder_lr = 1e-3
-        self.decoder_lr = 1e-3
-        self.critic_lr = 1e-3  # 1e-3
-        self.actor_lr  = 1e-4  # 1e-4
-
         # Optimizer with default values
-        self.encoder_optimizer = torch.optim.Adam(self.critic_net.encoder_net.parameters(), lr=self.encoder_lr)
-        self.decoder_optimizer = torch.optim.Adam(self.decoder_net.parameters(), lr=self.decoder_lr, weight_decay=1e-7)
-        self.actor_optimizer   = torch.optim.Adam(self.actor_net.parameters(),   lr=self.actor_lr)
-        self.critic_optimizer  = torch.optim.Adam(self.critic_net.parameters(),  lr=self.critic_lr)
-
-
-        self.actor_net.train(True)
-        self.critic_net.train(True)
-        self.critic_target_net.train(True)
-        self.actor_target_net.train(True)
-        self.decoder_net.train(True)
-
+        self.encoder_optimizer = torch.optim.Adam(self.critic_net.encoder_net.parameters(), lr=lr_encoder)
+        self.decoder_optimizer = torch.optim.Adam(self.decoder_net.parameters(), lr=lr_decoder, weight_decay=1e-7)
+        self.actor_optimizer   = torch.optim.Adam(self.actor_net.parameters(),   lr=lr_actor)
+        self.critic_optimizer  = torch.optim.Adam(self.critic_net.parameters(),  lr=lr_critic)
 
 
     def get_action_from_policy(self, state, evaluation=False, noise_scale=0.1):

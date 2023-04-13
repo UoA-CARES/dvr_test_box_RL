@@ -5,7 +5,7 @@ import torch.optim as optim
 from networks.weight_initialization import weight_init
 
 class Decoder(nn.Module):
-    def __init__(self, latent_dim, learning_rate, k=3):
+    def __init__(self, latent_dim, k=3):
 
         super(Decoder, self).__init__()
         self.num_filters = 32

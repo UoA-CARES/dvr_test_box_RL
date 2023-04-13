@@ -9,7 +9,7 @@ from networks.weight_initialization import weight_init
 
 
 class Actor(nn.Module):
-    def __init__(self, latent_size, num_actions, learning_rate):
+    def __init__(self, latent_size, num_actions):
 
         super(Actor, self).__init__()
         self.encoder_net = Encoder(latent_size)

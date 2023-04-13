@@ -86,15 +86,14 @@ def main():
 
     lr_actor   = 1e-3
     lr_critic  = 1e-4
-
     lr_decoder = 1e-3
     lr_encoder = 1e-3
 
     gamma = 0.99
     tau   = 0.005
 
-    actor_net   = Actor(latent_size, action_size, lr_actor)
-    critic_net  = Critic(latent_size, action_size, lr_critic, lr_encoder)
+    actor_net   = Actor(latent_size, action_size)
+    critic_net  = Critic(latent_size, action_size)
     decoder_net = Decoder(latent_size, lr_decoder)
 
     agent = AE_TD3(
@@ -105,7 +104,12 @@ def main():
         tau=tau,
         action_num=action_size,
         latent_size=latent_size,
+        lr_actor=1e-3,
+        lr_critic=1e-4,
+        lr_decoder=1e-3,
+        lr_encoder=1e-3,
         device=device,
+
     )
 
     train(env, agent)
