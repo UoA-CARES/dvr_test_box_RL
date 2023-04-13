@@ -18,7 +18,7 @@ from FrameStack import FrameStack
 
 def train(env, agent):
     max_steps_training    = 50_000
-    max_steps_exploration = 10_000
+    max_steps_exploration = 1_000
     batch_size            = 32
 
     seed = 232
@@ -94,7 +94,7 @@ def main():
 
     actor_net   = Actor(latent_size, action_size)
     critic_net  = Critic(latent_size, action_size)
-    decoder_net = Decoder(latent_size, lr_decoder)
+    decoder_net = Decoder(latent_size)
 
     agent = AE_TD3(
         actor_network=actor_net,
