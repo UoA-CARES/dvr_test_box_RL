@@ -40,7 +40,8 @@ class AE_TD3:
 
         # tie encoders between actor and critic, with this, any changes in the critic encoder
         # will also be affecting the actor-encoder during the WHOLE training
-        self.actor_net.encoder_net.copy_conv_weights_from(self.critic_net.encoder_net)
+        #self.actor_net.encoder_net.copy_conv_weights_from(self.critic_net.encoder_net)
+        self.actor_net.encoder_net.copy_all_weights_from(self.critic_net.encoder_net)
 
         self.actor_target_net  = copy.deepcopy(self.actor_net).to(device)
         self.critic_target_net = copy.deepcopy(self.critic_net).to(device)
@@ -150,4 +151,3 @@ class AE_TD3:
         ae_loss.backward()
         self.encoder_optimizer.step()
         self.decoder_optimizer.step()
-
