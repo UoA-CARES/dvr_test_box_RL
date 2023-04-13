@@ -11,7 +11,6 @@ import torch
 import torch.nn.functional as F
 
 
-
 class AE_TD3:
     def __init__(self,
                  actor_network,
@@ -53,6 +52,14 @@ class AE_TD3:
         self.decoder_optimizer = torch.optim.Adam(self.decoder_net.parameters(), lr=lr_decoder, weight_decay=1e-7)
         self.actor_optimizer   = torch.optim.Adam(self.actor_net.parameters(),   lr=lr_actor)
         self.critic_optimizer  = torch.optim.Adam(self.critic_net.parameters(),  lr=lr_critic)
+
+
+        self.actor_net.train(True)
+        self.critic_net.train(True)
+        self.critic_target_net.train(True)
+        self.actor_target_net.train(True)
+        self.decoder_net.train(True)
+
 
 
     def get_action_from_policy(self, state, evaluation=False, noise_scale=0.1):
