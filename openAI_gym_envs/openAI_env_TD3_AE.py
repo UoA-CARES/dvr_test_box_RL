@@ -1,4 +1,5 @@
 """
+good
 TD3 with deterministic AE for pendulum and BipedalWalker  env only
 This is my version and  re-implementation of the paper  https://arxiv.org/pdf/1910.01741.pdf
 however I removed or changed many part here. The original paper use SAC
@@ -71,8 +72,9 @@ class RLAgent:
         # tie encoders between actor and critic
         # with this, any changes in the critic encoder
         # will also be affecting the actor-encoder during the whole training
+
         #self.actor.encoder_net.copy_conv_weights_from(self.critic.encoder_net)
-        self.actor.encoder_net.copy_all_weights_from(self.critic.encoder_net)
+        self.actor.encoder_net.copy_all_weights_from(self.critic.encoder_net)  # original paper just copy cov weights
 
         # copy weights and bias from main to target networks
         self.critic_target.load_state_dict(self.critic.state_dict())
