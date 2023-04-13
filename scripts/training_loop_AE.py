@@ -17,7 +17,7 @@ from FrameStack import FrameStack
 
 
 def train(env, agent):
-    max_steps_training    = 50_000
+    max_steps_training    = 100_000
     max_steps_exploration = 1_000
     batch_size            = 32
 
@@ -84,10 +84,10 @@ def main():
     action_size = env.action_space.shape[0]
     latent_size = 50
 
-    lr_actor   = 1e-3
-    lr_critic  = 1e-4
-    lr_decoder = 1e-3
-    lr_encoder = 1e-3
+    # lr_actor   = 1e-3
+    # lr_critic  = 1e-4
+    # lr_decoder = 1e-3
+    # lr_encoder = 1e-3
 
     gamma = 0.99
     tau   = 0.005
@@ -105,10 +105,6 @@ def main():
         tau=tau,
         action_num=action_size,
         latent_size=latent_size,
-        lr_actor=lr_actor,
-        lr_critic=lr_critic,
-        lr_decoder=lr_decoder,
-        lr_encoder=lr_encoder,
         device=device,
 
     )

@@ -20,10 +20,6 @@ class AE_TD3:
                  tau,
                  action_num,
                  latent_size,
-                 lr_actor,
-                 lr_critic,
-                 lr_decoder,
-                 lr_encoder,
                  device):
 
         self.device = device
@@ -40,6 +36,7 @@ class AE_TD3:
 
         # tie encoders between actor and critic, with this, any changes in the critic encoder
         # will also be affecting the actor-encoder during the WHOLE training
+
         #self.actor_net.encoder_net.copy_conv_weights_from(self.critic_net.encoder_net)
         self.actor_net.encoder_net.copy_all_weights_from(self.critic_net.encoder_net)
 
@@ -48,11 +45,15 @@ class AE_TD3:
 
         self.decoder_net = decoder_network.to(device)
 
+        # lr_actor   = 1e-4
+        # lr_critic  = 1e-3
+        # lr_encoder = 1e-3
+        # lr_decoder = 1e-3
         # Optimizer with default values
-        self.encoder_optimizer = torch.optim.Adam(self.critic_net.encoder_net.parameters(), lr=lr_encoder)
-        self.decoder_optimizer = torch.optim.Adam(self.decoder_net.parameters(), lr=lr_decoder, weight_decay=1e-7)
-        self.actor_optimizer   = torch.optim.Adam(self.actor_net.parameters(),   lr=lr_actor)
-        self.critic_optimizer  = torch.optim.Adam(self.critic_net.parameters(),  lr=lr_critic)
+        # self.encoder_optimizer = torch.optim.Adam(self.critic_net.encoder_net.parameters(), lr=lr_encoder)
+        # self.decoder_optimizer = torch.optim.Adam(self.decoder_net.parameters(), lr=lr_decoder, weight_decay=1e-7)
+        # self.actor_optimizer   = torch.optim.Adam(self.actor_net.parameters(),   lr=lr_actor)
+        # self.critic_optimizer  = torch.optim.Adam(self.critic_net.parameters(),  lr=lr_critic)
 
 
         self.actor_net.train(True)
@@ -116,9 +117,13 @@ class AE_TD3:
         critic_loss_total = critic_loss_1 + critic_loss_2
 
         # Update the Critic
-        self.critic_optimizer.zero_grad()
+        # self.critic_optimizer.zero_grad()
+        # critic_loss_total.backward()
+        # self.critic_optimizer.step()
+
+        self.critic_net.optimiser.zero_grad()
         critic_loss_total.backward()
-        self.critic_optimizer.step()
+        self.critic_net.optimiser.step()
 
         # Update Actor
         if self.learn_counter % self.policy_update_freq == 0:
@@ -126,9 +131,14 @@ class AE_TD3:
             actor_q_values = torch.minimum(actor_q_one, actor_q_two)
             actor_loss = -actor_q_values.mean()
 
-            self.actor_optimizer.zero_grad()
+            # self.actor_optimizer.zero_grad()
+            # actor_loss.backward()
+            # self.actor_optimizer.step()
+
+            self.actor_net.optimiser.zero_grad()
             actor_loss.backward()
-            self.actor_optimizer.step()
+            self.actor_net.optimiser.step()
+
 
             # Update target network params
             for target_param, param in zip(self.critic_target_net.parameters(), self.critic_net.parameters()):
@@ -146,8 +156,14 @@ class AE_TD3:
 
         ae_loss = rec_loss + 1e-6 * latent_loss
 
-        self.encoder_optimizer.zero_grad()
-        self.decoder_optimizer.zero_grad()
+        # self.encoder_optimizer.zero_grad()
+        # self.decoder_optimizer.zero_grad()
+        # ae_loss.backward()
+        # self.encoder_optimizer.step()
+        # self.decoder_optimizer.step()
+
+        self.critic_net.optimiser_encoder.zero_grad()
+        self.decoder_net.optimiser.zero_grad()
         ae_loss.backward()
-        self.encoder_optimizer.step()
-        self.decoder_optimizer.step()
+        self.critic_net.optimiser_encoder.step()
+        self.decoder_net.optimiser.step()

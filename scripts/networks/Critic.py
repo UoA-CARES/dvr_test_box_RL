@@ -26,7 +26,9 @@ class Critic(nn.Module):
         self.h_linear_32 = nn.Linear(self.hidden_size[1], 1)
 
         self.apply(weight_init)
-        #self.optimiser = optim.Adam(self.parameters(), lr=learning_rate)
+
+        self.optimiser         = optim.Adam(self.parameters(), lr=1e-3)
+        self.optimiser_encoder = optim.Adam(self.encoder_net.parameters(), lr=1e-3)
 
 
 
