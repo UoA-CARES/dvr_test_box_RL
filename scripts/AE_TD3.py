@@ -44,6 +44,19 @@ class AE_TD3:
 
         self.decoder_net = decoder_network.to(device)
 
+
+        self.encoder_lr = 1e-3
+        self.decoder_lr = 1e-3
+        self.critic_lr = 1e-3  # 1e-3
+        self.actor_lr  = 1e-4  # 1e-4
+
+        # Optimizer with default values
+        self.encoder_optimizer = torch.optim.Adam(self.critic_net.encoder_net.parameters(), lr=self.encoder_lr)
+        self.decoder_optimizer = torch.optim.Adam(self.decoder_net.parameters(), lr=self.decoder_lr, weight_decay=1e-7)
+        self.actor_optimizer   = torch.optim.Adam(self.actor_net.parameters(),   lr=self.actor_lr)
+        self.critic_optimizer  = torch.optim.Adam(self.critic_net.parameters(),  lr=self.critic_lr)
+
+
         self.actor_net.train(True)
         self.critic_net.train(True)
         self.critic_target_net.train(True)
@@ -105,9 +118,9 @@ class AE_TD3:
         critic_loss_total = critic_loss_1 + critic_loss_2
 
         # Update the Critic
-        self.critic_net.optimiser.zero_grad()
+        self.critic_optimizer.zero_grad()
         critic_loss_total.backward()
-        self.critic_net.optimiser.step()
+        self.critic_optimizer.step()
 
         # Update Actor
         if self.learn_counter % self.policy_update_freq == 0:
@@ -115,9 +128,9 @@ class AE_TD3:
             actor_q_values = torch.minimum(actor_q_one, actor_q_two)
             actor_loss = -actor_q_values.mean()
 
-            self.actor_net.optimiser.zero_grad()
+            self.actor_optimizer.zero_grad()
             actor_loss.backward()
-            self.actor_net.optimiser.step()
+            self.actor_optimizer.step()
 
             # Update target network params
             for target_param, param in zip(self.critic_target_net.parameters(), self.critic_net.parameters()):
@@ -135,9 +148,9 @@ class AE_TD3:
 
         ae_loss = rec_loss + 1e-6 * latent_loss
 
-        self.critic_net.encoder_optimiser.zero_grad()
-        self.decoder_net.optimiser.zero_grad()
+        self.encoder_optimizer.zero_grad()
+        self.decoder_optimizer.zero_grad()
         ae_loss.backward()
-        self.critic_net.encoder_optimiser.step()
-        self.decoder_net.optimiser.step()
+        self.encoder_optimizer.step()
+        self.decoder_optimizer.step()
 
