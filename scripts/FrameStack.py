@@ -4,29 +4,28 @@ from collections import deque
 
 
 class FrameStack:
-    def __init__(self, env, k=3):
-        self.env = env
-        self.k   = k  # number of frames to be stacked
+    def __init__(self, env, k=3, seed=123):
+        self.env  = env
+        self.seed = seed
+        self.k    = k  # number of frames to be stacked
         self.frames_stacked = deque([], maxlen=k)
 
     def reset(self):
-        self.env.reset()
+        self.env.reset(seed=self.seed)
         obs = self.env.render()
         obs = self.preprocessing_image(obs)
         for _ in range(self.k):
             self.frames_stacked.append(obs)
-        # stacked_vector = np.concatenate(list(self.frames_stacked), axis=0)
-        stacked_vector = np.array(list(self.frames_stacked))
-        return stacked_vector
+        stacked_frames = np.array(self.frames_stacked)
+        return stacked_frames
 
     def step(self, action):
         _, reward, done, truncated, info = self.env.step(action)
         obs = self.env.render()
         obs = self.preprocessing_image(obs)
         self.frames_stacked.append(obs)
-        stacked_vector = np.array(list(self.frames_stacked))
-        # stacked_vector = np.concatenate(list(self.frames_stacked), axis=0)
-        return stacked_vector, reward, done, truncated, info
+        stacked_frames = np.array(self.frames_stacked)
+        return stacked_frames, reward, done, truncated, info
 
     def preprocessing_image(self, image_array):
         resized    = cv2.resize(image_array, (84, 84), interpolation=cv2.INTER_AREA)

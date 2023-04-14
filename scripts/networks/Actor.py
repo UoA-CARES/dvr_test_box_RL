@@ -21,7 +21,6 @@ class Actor(nn.Module):
         self.h_linear_3 = nn.Linear(in_features=self.hidden_size[1], out_features=num_actions)
 
         self.apply(weight_init)
-        self.optimiser = optim.Adam(self.parameters(), lr=1e-4)
 
 
     def forward(self, state, detach_encoder=False):

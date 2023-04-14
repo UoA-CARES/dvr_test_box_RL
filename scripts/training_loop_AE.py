@@ -7,6 +7,8 @@ logging.basicConfig(level=logging.INFO)
 from cares_reinforcement_learning.util import MemoryBuffer
 from cares_reinforcement_learning.util import helpers as hlp
 
+import numpy as np
+
 from networks import Actor
 from networks import Critic
 from networks import Decoder
@@ -17,6 +19,7 @@ from FrameStack import FrameStack
 
 
 def train(env, agent):
+
     max_steps_training    = 100_000
     max_steps_exploration = 1_000
     batch_size            = 32
@@ -28,8 +31,12 @@ def train(env, agent):
     min_action_value = env.action_space.low[0]
     max_action_value = env.action_space.high[0]
 
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    env.action_space.seed(seed)
+
     memory       = MemoryBuffer()
-    frames_stack = FrameStack(env, k)
+    frames_stack = FrameStack(env, k, seed)
 
     episode_timesteps = 0
     episode_reward    = 0
@@ -41,16 +48,13 @@ def train(env, agent):
 
     for total_step_counter in range(int(max_steps_training)):
         episode_timesteps += 1
-
         if total_step_counter < max_steps_exploration:
             logging.info(f"Running Exploration Steps {total_step_counter}/{max_steps_exploration}")
             action_env = env.action_space.sample()  # action range the env uses [e.g. -2 , 2 for pendulum]
             action     = hlp.normalize(action_env, max_action_value, min_action_value)  # algorithm range [-1, 1]
-
         else:
             action     = agent.get_action_from_policy(state)
             action_env = hlp.denormalize(action, max_action_value, min_action_value)
-
         next_state, reward, done, truncated, info = frames_stack.step(action_env)
         memory.add(state=state, action=action, reward=reward, next_state=next_state, done=done)
         state = next_state
@@ -74,6 +78,7 @@ def train(env, agent):
             episode_timesteps = 0
             episode_num += 1
 
+    hlp.plot_reward_curve(historical_reward)
 
 def main():
 
@@ -83,11 +88,6 @@ def main():
 
     action_size = env.action_space.shape[0]
     latent_size = 50
-
-    # lr_actor   = 1e-3
-    # lr_critic  = 1e-4
-    # lr_decoder = 1e-3
-    # lr_encoder = 1e-3
 
     gamma = 0.99
     tau   = 0.005

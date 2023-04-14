@@ -27,10 +27,6 @@ class Critic(nn.Module):
 
         self.apply(weight_init)
 
-        self.optimiser         = optim.Adam(self.parameters(), lr=1e-3)
-        self.optimiser_encoder = optim.Adam(self.encoder_net.parameters(), lr=1e-3)
-
-
 
     def forward(self, state, action, detach_encoder=False):
         z_vector = self.encoder_net(state, detach=detach_encoder)

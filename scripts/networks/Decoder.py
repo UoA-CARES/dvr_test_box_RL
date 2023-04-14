@@ -25,7 +25,6 @@ class Decoder(nn.Module):
         )
 
         self.apply(weight_init)
-        self.optimiser = optim.Adam(self.parameters(), lr=1e-3, weight_decay=1e-7)
 
 
     def forward(self, x):
