@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
 
 from networks.weight_initialization import weight_init
 
@@ -21,7 +20,7 @@ class Decoder(nn.Module):
             nn.ConvTranspose2d(in_channels=self.num_filters, out_channels=self.num_filters, kernel_size=3, stride=1),
             nn.ReLU(),
             nn.ConvTranspose2d(in_channels=self.num_filters, out_channels=k, kernel_size=3, stride=2, output_padding=1),
-            nn.Sigmoid(),  # original paper no use activation function here. I added it and helps
+            nn.Sigmoid(),  # original paper no use activation function here. I added it and helps for reconstruction
         )
 
         self.apply(weight_init)

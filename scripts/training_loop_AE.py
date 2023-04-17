@@ -20,7 +20,7 @@ from FrameStack import FrameStack
 
 def train(env, agent):
 
-    max_steps_training    = 100_000
+    max_steps_training    = 300_000
     max_steps_exploration = 1_000
     batch_size            = 32
 
@@ -84,10 +84,10 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    env = gym.make('BipedalWalker-v3', render_mode="rgb_array")  # for AE needs to be rgb_array in render_mode  #BipedalWalker-v3, Pendulum-v1
+    env = gym.make('Pendulum-v1', render_mode="rgb_array")  # for AE needs to be rgb_array in render_mode  #BipedalWalker-v3, Pendulum-v1
 
     action_size = env.action_space.shape[0]
-    latent_size = 50
+    latent_size = 50 # 50
 
     gamma = 0.99
     tau   = 0.005
