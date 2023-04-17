@@ -4,6 +4,7 @@ This is my version and  re-implementation of the paper  https://arxiv.org/pdf/19
 I removed and changed many part here from the original implementation for example the original paper use SAC
 """
 
+import os
 import copy
 import numpy as np
 
@@ -40,8 +41,8 @@ class AE_TD3:
         #self.actor_net.encoder_net.copy_conv_weights_from(self.critic_net.encoder_net) # original paper do this
         self.actor_net.encoder_net.copy_all_weights_from(self.critic_net.encoder_net) # I use this version
 
-        self.actor_target_net  = copy.deepcopy(self.actor_net)#.to(device)
-        self.critic_target_net = copy.deepcopy(self.critic_net)#.to(device)
+        self.actor_target_net  = copy.deepcopy(self.actor_net)
+        self.critic_target_net = copy.deepcopy(self.critic_net)
 
         self.decoder_net = decoder_network.to(device)
 
@@ -57,7 +58,7 @@ class AE_TD3:
 
 
     def get_action_from_policy(self, state, evaluation=False, noise_scale=0.1):
-        #self.actor_net.eval()
+        self.actor_net.eval()
         with torch.no_grad():
             state_tensor = torch.FloatTensor(state).to(self.device)
             state_tensor = state_tensor.unsqueeze(0)
@@ -68,7 +69,7 @@ class AE_TD3:
                 noise  = np.random.normal(0, scale=noise_scale, size=self.action_num)
                 action = action + noise
                 action = np.clip(action, -1, 1)
-        #self.actor_net.train()
+        self.actor_net.train()
         return action
 
 
@@ -113,22 +114,6 @@ class AE_TD3:
         critic_loss_total.backward()
         self.critic_optimizer.step()
 
-        # Update Autoencoder
-        z_vector = self.critic_net.encoder_net(states)
-        rec_obs  = self.decoder_net(z_vector)
-
-        rec_loss    = F.mse_loss(states, rec_obs)
-        latent_loss = (0.5 * z_vector.pow(2).sum(1)).mean()  # add L2 penalty on latent representation
-
-        ae_loss = rec_loss + 1e-6 * latent_loss
-
-        self.encoder_optimizer.zero_grad()
-        self.decoder_optimizer.zero_grad()
-        ae_loss.backward()
-        self.encoder_optimizer.step()
-        self.decoder_optimizer.step()
-
-
         # Update Actor
         if self.learn_counter % self.policy_update_freq == 0:
             actor_q_one, actor_q_two = self.critic_net(states, self.actor_net(states, detach_encoder=True),  detach_encoder=True)
@@ -146,3 +131,33 @@ class AE_TD3:
             for target_param, param in zip(self.actor_target_net.parameters(), self.actor_net.parameters()):
                 target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
 
+
+        # Update Autoencoder
+        z_vector = self.critic_net.encoder_net(states)
+        rec_obs  = self.decoder_net(z_vector)
+
+        rec_loss    = F.mse_loss(states, rec_obs)
+        latent_loss = (0.5 * z_vector.pow(2).sum(1)).mean()  # add L2 penalty on latent representation
+
+        ae_loss = rec_loss + 1e-6 * latent_loss
+
+        self.encoder_optimizer.zero_grad()
+        self.decoder_optimizer.zero_grad()
+        ae_loss.backward()
+        self.encoder_optimizer.step()
+        self.decoder_optimizer.step()
+
+
+    def save_models(self, filename):
+        dir_exists = os.path.exists("models")
+
+        if not dir_exists:
+            os.makedirs("models")
+        torch.save(self.actor_net.state_dict(),  f'models/{filename}_actor.pht')
+        torch.save(self.critic_net.state_dict(), f'models/{filename}_critic.pht')
+        print("models has been saved...")
+
+    def load_models(self, filename):
+        self.actor_net.load_state_dict(torch.load(f'models/{filename}_actor.pht'))
+        self.critic_net.load_state_dict(torch.load(f'models/{filename}_critic.pht'))
+        print("models has been loaded...")

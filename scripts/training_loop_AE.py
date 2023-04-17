@@ -84,7 +84,7 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    env = gym.make('Pendulum-v1', render_mode="rgb_array")  # for AE needs to be rgb_array in render_mode
+    env = gym.make('BipedalWalker-v3', render_mode="rgb_array")  # for AE needs to be rgb_array in render_mode  #BipedalWalker-v3, Pendulum-v1
 
     action_size = env.action_space.shape[0]
     latent_size = 50
