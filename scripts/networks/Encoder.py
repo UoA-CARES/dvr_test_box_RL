@@ -26,7 +26,6 @@ class Encoder(nn.Module):
 
         self.apply(weight_init)
 
-
     def forward_conv(self, x):
         conv = torch.relu(self.cov_net[0](x))
         for i in range(1, self.num_layers):
@@ -36,12 +35,24 @@ class Encoder(nn.Module):
 
     def forward(self, obs, detach=False):
         h = self.forward_conv(obs)
-        if detach:
-            h = h.detach()
-        h_fc = self.fc(h)
+        h_fc   = self.fc(h)
         h_norm = self.ln(h_fc)
-        out = torch.tanh(h_norm)
-        return out
+        out     = torch.tanh(h_norm)
+        # Also, I change this, original paper just detach the conv net
+        if detach:
+            z = out.detach()
+        else:
+            z = out
+        return z
+
+    # def forward(self, obs, detach=False):
+    #     h = self.forward_conv(obs)
+    #     if detach:
+    #         h = h.detach()
+    #     h_fc = self.fc(h)
+    #     h_norm = self.ln(h_fc)
+    #     out = torch.tanh(h_norm)
+    #     return out
 
     def copy_conv_weights_from(self, model_source):
         for i in range(self.num_layers):
@@ -51,4 +62,4 @@ class Encoder(nn.Module):
         for i in range(self.num_layers):
             tie_weights(src=model_source.cov_net[i], trg=self.cov_net[i])
         tie_weights(src=model_source.fc, trg=self.fc)
-        #tie_weights(src=model_source.ln, trg=self.ln)
+        tie_weights(src=model_source.ln, trg=self.ln)

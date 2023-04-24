@@ -18,15 +18,17 @@ from FrameStack import FrameStack
 
 
 
-def train(env, agent):
+def train(env, agent, env_name):
 
     max_steps_training    = 300_000
     max_steps_exploration = 1_000
     batch_size            = 32
 
-    seed = 232
+    seed = 5059
     G    = 10
     k    = 3
+
+    file_name = env_name+"_"+str(seed)
 
     min_action_value = env.action_space.low[0]
     max_action_value = env.action_space.high[0]
@@ -78,13 +80,16 @@ def train(env, agent):
             episode_timesteps = 0
             episode_num += 1
 
+    agent.save_models(filename=file_name)
     hlp.plot_reward_curve(historical_reward)
+
 
 def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    env = gym.make('Pendulum-v1', render_mode="rgb_array")  # for AE needs to be rgb_array in render_mode  #BipedalWalker-v3, Pendulum-v1
+    env_gym_name = "Pendulum-v1" #BipedalWalker-v3, Pendulum-v1, HalfCheetah-v4"
+    env = gym.make(env_gym_name, render_mode="rgb_array")  # for AE needs to be rgb_array in render_mode
 
     action_size = env.action_space.shape[0]
     latent_size = 50 # 50
@@ -109,7 +114,7 @@ def main():
 
     )
 
-    train(env, agent)
+    train(env, agent, env_gym_name)
 
 
 if __name__ == '__main__':
