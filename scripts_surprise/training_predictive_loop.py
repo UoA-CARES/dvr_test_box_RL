@@ -19,8 +19,8 @@ def train(env, prediction_model):
 
     max_steps_training    = 10_000
     max_steps_exploration = 1_000
-    batch_size = 4
-    seed = 452
+    batch_size = 32
+    seed = 123
 
     min_action_value = env.action_space.low[0]
     max_action_value = env.action_space.high[0]

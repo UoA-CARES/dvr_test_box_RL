@@ -23,8 +23,8 @@ class Deep_Ensemble:
         learning_rate = 1e-3
         weight_decay  = 1e-3
 
-        #self.optimizers = [torch.optim.Adam(self.ensemble_network[i].parameters(), lr=learning_rate, weight_decay=weight_decay) for i in range(self.ensemble_size)]
-        self.optimizers = [torch.optim.Adam(self.ensemble_network[i].parameters(), lr=learning_rate) for i in range(self.ensemble_size)]
+        self.optimizers = [torch.optim.Adam(self.ensemble_network[i].parameters(), lr=learning_rate, weight_decay=weight_decay) for i in range(self.ensemble_size)]
+        #self.optimizers = [torch.optim.Adam(self.ensemble_network[i].parameters(), lr=learning_rate) for i in range(self.ensemble_size)]
 
     def train_transition_model(self, experiences):
         states, actions, _, next_states, _ = experiences
@@ -41,7 +41,7 @@ class Deep_Ensemble:
 
             # Calculate Loss
             prediction_loss_function = nn.GaussianNLLLoss(full=False, reduction='mean', eps=1e-6)
-            loss = prediction_loss_function(prediction[0], next_states, prediction[1]) # input, target, variance
+            loss = prediction_loss_function(prediction[0], next_states, prediction[1])  # input, target, variance
 
             # Update weights and bias
             optimizer.zero_grad()
@@ -49,6 +49,7 @@ class Deep_Ensemble:
             optimizer.step()
 
     def get_prediction_from_model(self, state, action):
+
         state_tensor = torch.FloatTensor(state).to(self.device)
         state_tensor = state_tensor.unsqueeze(0)
 
@@ -71,29 +72,6 @@ class Deep_Ensemble:
 
         return avr_mean, avr_var
 
-
-
-
-
-    def evaluate_transition_model(self, experiences):
-        states, actions, _, _, _ = experiences # need to pass a single value here, maybe
-
-        predict_mean_set, predict_var_set = [], []
-        for network in self.ensemble_network:
-            network.eval()
-            predict_mean, predict_variance = network(states, actions)
-
-            predict_mean_set.append(predict_mean.detach().cpu().numpy())
-            predict_var_set.append(predict_variance.detach().cpu().numpy())
-
-        ensemble_means = np.concatenate(predict_mean_set, axis=0)
-        ensemble_vars  = np.concatenate(predict_var_set, axis=0)
-
-        ensemble_means = np.array(ensemble_means)
-        ensemble_vars  = np.array(ensemble_vars)  # do i need this?
-
-        avr_mean = np.mean(ensemble_means, axis=0)
-        avr_var  = np.mean(ensemble_vars, axis=0)
 
 
     def save_model(self):
