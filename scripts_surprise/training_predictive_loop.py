@@ -15,7 +15,6 @@ from cares_reinforcement_learning.util import helpers as hlp
 
 
 
-
 def train(env, prediction_model):
 
     max_steps_training    = 10_000

@@ -11,18 +11,22 @@ from cares_reinforcement_learning.util import helpers as hlp
 
 def evaluation(env, prediction_ensemble_model):
     prediction_ensemble_model.load_model()
+
     min_action_value = env.action_space.low[0]
     max_action_value = env.action_space.high[0]
 
     state, _   = env.reset()
     action_env = env.action_space.sample()
     action     = hlp.normalize(action_env, max_action_value, min_action_value)  # algorithm range [-1, 1]
+
     next_state, reward, done, truncated, info = env.step(action_env)
 
-    next_state_predicted = prediction_ensemble_model.get_prediction_from_model(state, action)
+    mean_predict, var_predict = prediction_ensemble_model.get_prediction_from_model(state, action)
 
-    print(state)
     print(next_state)
+    print(mean_predict)
+
+
 
 
 def main():

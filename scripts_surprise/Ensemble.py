@@ -49,7 +49,30 @@ class Deep_Ensemble:
             optimizer.step()
 
     def get_prediction_from_model(self, state, action):
-        pass
+        state_tensor = torch.FloatTensor(state).to(self.device)
+        state_tensor = state_tensor.unsqueeze(0)
+
+        action_tensor = torch.FloatTensor(action).to(self.device)
+        action_tensor = action_tensor.unsqueeze(0)
+
+        predict_mean_set, predict_var_set = [], []
+        for network in self.ensemble_network:
+            network.eval()
+            predict_mean, predict_variance = network(state_tensor, action_tensor)
+
+            predict_mean_set.append(predict_mean.detach().cpu().numpy())
+            predict_var_set.append(predict_variance.detach().cpu().numpy())
+
+        ensemble_means = np.concatenate(predict_mean_set, axis=0)
+        ensemble_vars  = np.concatenate(predict_var_set, axis=0)
+
+        avr_mean = np.mean(ensemble_means, axis=0)
+        avr_var  = np.mean(ensemble_vars, axis=0)
+
+        return avr_mean, avr_var
+
+
+
 
 
     def evaluate_transition_model(self, experiences):
