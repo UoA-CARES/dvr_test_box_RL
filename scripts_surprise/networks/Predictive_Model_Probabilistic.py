@@ -12,7 +12,7 @@ class Transition_Network(nn.Module):
 
         self.input_dim   = input_dim
         self.output_dim  = output_dim
-        self.hidden_size = [64, 32]
+        self.hidden_size = [512, 512]
 
         self.mean_layer = nn.Sequential(
             nn.Linear(in_features=self.input_dim, out_features=self.hidden_size[0]),
@@ -22,7 +22,7 @@ class Transition_Network(nn.Module):
             nn.Linear(in_features=self.hidden_size[1], out_features=self.output_dim),
         )
 
-        self.std_layer = nn.Sequential(
+        self.var_layer = nn.Sequential(
             nn.Linear(in_features=self.input_dim, out_features=self.hidden_size[0]),
             nn.ReLU(),
             nn.Linear(in_features=self.hidden_size[0], out_features=self.hidden_size[1]),
@@ -33,6 +33,7 @@ class Transition_Network(nn.Module):
 
     def forward(self, state, action):
         x   = torch.cat([state, action], dim=1)
+
         u   = self.mean_layer(x)
-        std = self.std_layer(x) + 1e-06 # to make sure std is always positive and > 0
-        return u, std
+        var = self.var_layer(x) #+ 1e-06 # to make sure variance is always positive and > 0
+        return u, var
