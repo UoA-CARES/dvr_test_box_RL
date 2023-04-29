@@ -18,7 +18,7 @@ from cares_reinforcement_learning.util import helpers as hlp
 def train(env, prediction_model):
 
     max_steps_training    = 10_000
-    max_steps_exploration = 1_000
+    max_steps_exploration = 2_000
     batch_size = 32
     seed = 123
 
@@ -56,6 +56,7 @@ def train(env, prediction_model):
         if total_step_counter >= max_steps_exploration:
             experiences = memory.sample(batch_size)
             prediction_model.train_transition_model(experiences)
+            #prediction_model.train_transition_model_discrete(experiences)
 
         if done or truncated:
             logging.info(f"Total T:{total_step_counter + 1} Episode {episode_num + 1} was completed with {episode_timesteps} steps taken and a Reward= {episode_reward:.3f}")
@@ -82,7 +83,7 @@ def main():
         input_dim=obs_size+action_size,
         output_dim=obs_size,
         device=device,
-        ensemble_size=5
+        ensemble_size=10
     )
 
     train(env, prediction_model)

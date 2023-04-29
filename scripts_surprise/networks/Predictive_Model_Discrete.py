@@ -11,7 +11,7 @@ class Transition_Network_Discrete(nn.Module):
 
         self.input_dim   = input_dim
         self.output_dim  = output_dim
-        self.hidden_size = [64, 32]
+        self.hidden_size = [512, 512]
 
         self.prediction_net = nn.Sequential(
             nn.Linear(in_features=self.input_dim, out_features=self.hidden_size[0]),

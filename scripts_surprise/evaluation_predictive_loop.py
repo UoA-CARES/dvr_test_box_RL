@@ -21,10 +21,11 @@ def evaluation(env, prediction_ensemble_model):
 
     next_state, reward, done, truncated, info = env.step(action_env)
 
-    mean_predict, var_predict = prediction_ensemble_model.get_prediction_from_model(state, action)
+    prediction_ensemble_model.get_prediction_from_model(state, action)
+    #prediction_ensemble_model.get_prediction_from_model_discrete(state, action)
 
-    print(next_state)
-    print(mean_predict)
+    print("Next State True", next_state)
+
 
 
 
@@ -42,7 +43,7 @@ def main():
         input_dim=obs_size+action_size,
         output_dim=obs_size,
         device=device,
-        ensemble_size=5
+        ensemble_size=10
     )
 
     evaluation(env, prediction_model)
