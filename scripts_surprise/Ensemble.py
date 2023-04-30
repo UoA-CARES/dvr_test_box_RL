@@ -25,7 +25,7 @@ class Deep_Ensemble:
         self.ensemble_network.extend(networks)
         self.ensemble_network.to(self.device)
 
-        learning_rate = 1e-6
+        learning_rate = 1e-4
         weight_decay  = 1e-3
 
         self.optimizers = [torch.optim.Adam(self.ensemble_network[i].parameters(), lr=learning_rate, weight_decay=weight_decay) for i in range(self.ensemble_size)]
@@ -118,8 +118,6 @@ class Deep_Ensemble:
 
         avr_mean = np.mean(ensemble_means, axis=0)
         avr_std  = np.mean(ensemble_stds, axis=0)
-
-        print(avr_mean, avr_std)
 
         return avr_mean, avr_std
 
