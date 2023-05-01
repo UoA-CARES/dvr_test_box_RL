@@ -10,7 +10,7 @@ from networks import Transition_Network_Discrete
 import torch.nn.functional as F
 
 
-class Deep_Ensemble:
+class Deep_Surprise:
     def __init__(self, input_dim, output_dim, device, ensemble_size=3):
         self.input_dim     = input_dim
         self.output_dim    = output_dim

@@ -5,7 +5,7 @@ import numpy as np
 import logging
 logging.basicConfig(level=logging.INFO)
 
-from Ensemble import Deep_Ensemble
+from Surprise import Deep_Surprise
 from cares_reinforcement_learning.util import helpers as hlp
 
 
@@ -39,7 +39,7 @@ def main():
     obs_size    = env.observation_space.shape[0]
     action_size = env.action_space.shape[0]
 
-    prediction_model = Deep_Ensemble(
+    prediction_model = Deep_Surprise(
         input_dim=obs_size+action_size,
         output_dim=obs_size,
         device=device,
