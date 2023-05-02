@@ -20,7 +20,7 @@ def preprocessing_image(image_array):
 
 def train(env, autoencoder_model):
 
-    max_steps_training    = 10_000
+    max_steps_training    = 50_000
     max_steps_exploration = 2_000
     batch_size = 32
     seed = 123
