@@ -21,10 +21,12 @@ def evaluation(env, prediction_ensemble_model):
 
     next_state, reward, done, truncated, info = env.step(action_env)
 
-    avr_mean, avr_std = prediction_ensemble_model.get_prediction_from_model(state, action)
+    avr_mean, avr_std, avr_std_total = prediction_ensemble_model.get_prediction_from_model(state, action)
     #prediction_ensemble_model.get_prediction_from_model_discrete(state, action)
 
-    print("Uncertainly in the prediction", avr_std)
+    print("Uncertainly in each element of prediction", avr_std)
+    print("Average Uncertainly in prediction", avr_std_total)
+
     print("Predicted State", avr_mean)
     print("Next State True", next_state)
 

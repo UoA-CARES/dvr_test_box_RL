@@ -119,7 +119,9 @@ class Deep_Surprise:
         avr_mean = np.mean(ensemble_means, axis=0)
         avr_std  = np.mean(ensemble_stds, axis=0)
 
-        return avr_mean, avr_std
+        avr_std_total = np.mean(ensemble_stds)
+
+        return avr_mean, avr_std, avr_std_total
 
 
     def save_model(self):

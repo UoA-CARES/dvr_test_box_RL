@@ -36,6 +36,7 @@ def evaluation(env, autoencoder_model):
     input_img = state[0]
     reconstruction_img = reconstruction[0][0]
 
+
     #difference = ((input_img - reconstruction_img) * 255).astype("uint8")
     difference = (input_img - reconstruction_img)
 
