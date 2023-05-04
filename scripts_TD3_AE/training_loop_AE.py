@@ -24,7 +24,7 @@ def train(env, agent, env_name):
     max_steps_exploration = 1_000
     batch_size            = 32
 
-    seed = 5059
+    seed = 571
     G    = 10
     k    = 3
 

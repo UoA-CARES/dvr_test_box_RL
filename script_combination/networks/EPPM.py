@@ -10,11 +10,8 @@ import torch.nn as nn
 from networks.weight_initialization import weight_init
 
 class EPPM(nn.Module):
-    def __init__(self, latent_size, num_actions, encoder):
+    def __init__(self, latent_size, num_actions):
         super(EPPM, self).__init__()
-
-        #self.encoder_net = Encoder(latent_size)
-        self.encoder_net = encoder
 
 
         self.input_dim   = latent_size + num_actions
@@ -40,13 +37,8 @@ class EPPM(nn.Module):
 
         self.apply(weight_init)
 
-    def forward_encoder(self, state, detach_encoder):
-        latent_vector = self.encoder_net(state, detach=detach_encoder)
-        return latent_vector
-
-    def forward(self, state, action, detach_encoder=False):
-        z_vector = self.forward_encoder(state, detach_encoder)
-        x   = torch.cat([z_vector, action], dim=1)
+    def forward(self, state, action):
+        x   = torch.cat([state, action], dim=1)
         u   = self.mean_layer(x)
         std = self.std_layer(x) + 1e-6
         return torch.distributions.Normal(u, std)

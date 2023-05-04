@@ -29,7 +29,7 @@ def train(env, model_policy):
     max_steps_exploration = 1_000
 
     batch_size = 32
-    seed       = 123
+    seed       = 571
     G          = 10
     k          = 3
 
@@ -89,7 +89,7 @@ def train(env, model_policy):
             for _ in range(G):
                 experiences = memory.sample(batch_size)
                 model_policy.train_policy(experiences)
-                #model_policy.train_predictive_model(experiences)
+            model_policy.train_predictive_model(experiences)
 
         if done or truncated:
             logging.info(f"Total T:{total_step_counter + 1} Episode {episode_num + 1} was completed with {episode_timesteps} steps taken and a Reward= {episode_reward:.3f}")

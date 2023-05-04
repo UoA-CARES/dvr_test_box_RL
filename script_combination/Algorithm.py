@@ -41,7 +41,7 @@ class Algorithm:
         self.critic  = Critic(self.latent_size, self.action_num, self.encoder).to(self.device)
 
         self.eppm = nn.ModuleList()
-        networks = [EPPM(self.latent_size, self.action_num, self.encoder) for _ in range(self.ensemble_size)]
+        networks = [EPPM(self.latent_size, self.action_num) for _ in range(self.ensemble_size)]
         self.eppm.extend(networks)
         self.eppm.to(self.device)
 
@@ -212,17 +212,21 @@ class Algorithm:
         states, actions, _, next_states, _ = experiences
 
         with torch.no_grad():
-            # This is my ground truth value Next state img --> Encoder --> St
+            # This is my ground truth value
+            # state img --> Encoder -->  zt
+            # Next state img --> Encoder --> next zt
             states      = torch.FloatTensor(np.asarray(states)).to(self.device)
             actions     = torch.FloatTensor(np.asarray(actions)).to(self.device)
             next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
+
+            latent_state      = self.encoder(states, detach=True)
             latent_next_state = self.encoder(next_states, detach=True)
 
         for predictive_network, optimizer in zip(self.eppm, self.eppm_optimizers):
             predictive_network.train()
 
             # Get the Prediction of each model
-            prediction_distribution = predictive_network(states, actions, detach_encoder=True) # todo experiment this with False to see what happen
+            prediction_distribution = predictive_network(latent_state, actions)
             loss_neg_log_likelihood = - prediction_distribution.log_prob(latent_next_state)
             loss_neg_log_likelihood = torch.mean(loss_neg_log_likelihood)
 
@@ -230,3 +234,4 @@ class Algorithm:
             optimizer.zero_grad()
             loss_neg_log_likelihood.backward()
             optimizer.step()
+

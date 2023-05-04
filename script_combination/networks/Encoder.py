@@ -38,10 +38,8 @@ class Encoder(nn.Module):
         h_norm = self.ln(h_fc)
         out    = torch.tanh(h_norm)
         if detach:
-            z = out.detach()
-        else:
-            z = out
-        return z
+            out = out.detach()
+        return out
 
     # def copy_conv_weights_from(self, model_source):
     #     for i in range(self.num_layers):
