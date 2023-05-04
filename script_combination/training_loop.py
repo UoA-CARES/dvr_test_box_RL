@@ -1,4 +1,5 @@
 
+import cv2
 import gym
 import torch
 import numpy as np
@@ -11,6 +12,15 @@ from cares_reinforcement_learning.util import helpers as hlp
 
 from Algorithm import Algorithm
 from FrameStack import FrameStack
+
+
+
+def preprocessing_image(image_array):
+    resized    = cv2.resize(image_array, (84, 84), interpolation=cv2.INTER_AREA)
+    gray_image = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+    norm_image = cv2.normalize(gray_image, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+    image_out  = np.expand_dims(norm_image, axis=0) # to make it (1, channel, w, h) because I am using a single img here
+    return image_out
 
 
 def train(env, model_policy):
@@ -37,9 +47,10 @@ def train(env, model_policy):
     episode_reward    = 0
     episode_num       = 0
 
-    state = frames_stack.reset()
-
-    historical_reward = {"step": [], "episode_reward": [], "episode_novelty": [], "episode_surprise": []}
+    state = frames_stack.reset()  # for 3 images
+    # _, _  = env.reset(seed=seed)
+    # state = env.render()
+    # state = preprocessing_image(state)  # for single image
 
     for total_step_counter in range(int(max_steps_training)):
         episode_timesteps += 1
@@ -52,11 +63,15 @@ def train(env, model_policy):
             action     = model_policy.get_action_from_policy(state)
             action_env = hlp.denormalize(action, max_action_value, min_action_value)
 
+        # _, reward_extrinsic, done, truncated, info = env.step(action_env)
+        # next_state = env.render()
+        # next_state = preprocessing_image(next_state)
+
         next_state, reward_extrinsic, done, truncated, info = frames_stack.step(action_env)
 
         # intrinsic rewards
-        surprise_rate = model_policy.get_surprise_rate(state, action)
-        novelty_rate  = model_policy.get_novelty_rate(state)
+        # surprise_rate = model_policy.get_surprise_rate(state, action)
+        # novelty_rate  = model_policy.get_novelty_rate(state)
 
         rew_surprise = 0
         rew_novelty  = 0
@@ -74,15 +89,21 @@ def train(env, model_policy):
             for _ in range(G):
                 experiences = memory.sample(batch_size)
                 model_policy.train_policy(experiences)
-                model_policy.train_predictive_model(experiences)
+                #model_policy.train_predictive_model(experiences)
 
         if done or truncated:
             logging.info(f"Total T:{total_step_counter + 1} Episode {episode_num + 1} was completed with {episode_timesteps} steps taken and a Reward= {episode_reward:.3f}")
 
+            # Reset environment
+            # _, _ = env.reset(seed=seed)
+            # state = env.render()
+            # state = preprocessing_image(state)
             state = frames_stack.reset()
+
             episode_reward    = 0
             episode_timesteps = 0
             episode_num += 1
+
 
 def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

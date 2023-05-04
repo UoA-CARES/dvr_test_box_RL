@@ -211,11 +211,12 @@ class Algorithm:
 
         states, actions, _, next_states, _ = experiences
 
-        states  = torch.FloatTensor(np.asarray(states)).to(self.device)
-        actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
-
-        next_states       = torch.FloatTensor(np.asarray(next_states)).to(self.device)
-        latent_next_state = self.encoder(next_states).detach() # to take the latent vector, my ground truth value
+        with torch.no_grad():
+            # This is my ground truth value Next state img --> Encoder --> St
+            states      = torch.FloatTensor(np.asarray(states)).to(self.device)
+            actions     = torch.FloatTensor(np.asarray(actions)).to(self.device)
+            next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
+            latent_next_state = self.encoder(next_states, detach=True)
 
         for predictive_network, optimizer in zip(self.eppm, self.eppm_optimizers):
             predictive_network.train()

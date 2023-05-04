@@ -3,10 +3,10 @@ import torch.nn as nn
 from networks.weight_initialization import weight_init
 
 
-def tie_weights(src, trg):
-    assert type(src) == type(trg)
-    trg.weight = src.weight
-    trg.bias = src.bias
+# def tie_weights(src, trg):
+#     assert type(src) == type(trg)
+#     trg.weight = src.weight
+#     trg.bias = src.bias
 
 
 class Encoder(nn.Module):
