@@ -37,16 +37,18 @@ class Algorithm:
         self.encoder = Encoder(self.latent_size).to(self.device)
         self.decoder = Decoder(self.latent_size).to(self.device)
 
-        self.actor   = Actor(self.latent_size, self.action_num, self.encoder).to(self.device)
-        self.critic  = Critic(self.latent_size, self.action_num, self.encoder).to(self.device)
+        self.actor  = Actor(self.latent_size, self.action_num, self.encoder).to(self.device)
+        self.critic = Critic(self.latent_size, self.action_num, self.encoder).to(self.device)
+
+        self.actor_target  = Actor(self.latent_size, self.action_num, self.encoder).to(self.device)
+        self.critic_target = Critic(self.latent_size, self.action_num, self.encoder).to(self.device)
+        self.critic_target.load_state_dict(self.critic.state_dict())
+        self.actor_target.load_state_dict(self.actor.state_dict())
 
         self.eppm = nn.ModuleList()
         networks = [EPPM(self.latent_size, self.action_num) for _ in range(self.ensemble_size)]
         self.eppm.extend(networks)
         self.eppm.to(self.device)
-
-        self.actor_target  = copy.deepcopy(self.actor)
-        self.critic_target = copy.deepcopy(self.critic)
 
         lr_actor   = 1e-4
         lr_critic  = 1e-3
@@ -64,7 +66,7 @@ class Algorithm:
 
 
     def get_action_from_policy(self, state, evaluation=False, noise_scale=0.1):
-        self.actor.eval()
+        #self.actor.eval()
         with torch.no_grad():
             state_tensor = torch.FloatTensor(state).to(self.device)
             state_tensor = state_tensor.unsqueeze(0)
@@ -75,32 +77,33 @@ class Algorithm:
                 noise = np.random.normal(0, scale=noise_scale, size=self.action_num)
                 action = action + noise
                 action = np.clip(action, -1, 1)
-        self.actor.train()
+        #self.actor.train()
         return action
 
     def get_surprise_rate(self, state, action):
 
         with torch.no_grad():
-            state_tensor = torch.FloatTensor(state).to(self.device)
-            state_tensor = state_tensor.unsqueeze(0)
-
+            state_tensor  = torch.FloatTensor(state).to(self.device)
+            state_tensor  = state_tensor.unsqueeze(0)
             action_tensor = torch.FloatTensor(action).to(self.device)
             action_tensor = action_tensor.unsqueeze(0)
+
+            latent_state  = self.encoder(state_tensor, detach=True)
 
             predict_mean_set, predict_std_set = [], []
 
             for network in self.eppm:
                 network.eval()
-                predicted_distribution = network(state_tensor, action_tensor)
+                predicted_distribution = network(latent_state, action_tensor)
 
                 mean = predicted_distribution.mean
-                std = predicted_distribution.stddev
+                std  = predicted_distribution.stddev
 
                 predict_mean_set.append(mean.detach().cpu().numpy())
                 predict_std_set.append(std.detach().cpu().numpy())
 
             ensemble_means = np.concatenate(predict_mean_set, axis=0)
-            ensemble_stds = np.concatenate(predict_std_set, axis=0)
+            ensemble_stds  = np.concatenate(predict_std_set, axis=0)
 
             avr_mean = np.mean(ensemble_means, axis=0)
             avr_std  = np.mean(ensemble_stds, axis=0)
@@ -111,31 +114,34 @@ class Algorithm:
 
     def get_novelty_rate(self, state):
 
-        state_tensor_img = torch.FloatTensor(state).to(self.device)
-        state_tensor_img = state_tensor_img.unsqueeze(0)
-
-        self.encoder.eval()
-        self.decoder.eval()
+        #self.encoder.eval()
+        #self.decoder.eval()
         with torch.no_grad():
+            state_tensor_img = torch.FloatTensor(state).to(self.device)
+            state_tensor_img = state_tensor_img.unsqueeze(0)
+
             z_vector = self.encoder(state_tensor_img)
-            rec_img = self.decoder(z_vector)
+            rec_img  = self.decoder(z_vector)
 
-        # todo note that this is a stack of 3 images
-        original_stack_imgs  = state_tensor_img.cpu().numpy()[0]
-        reconstruction_stack = rec_img.cpu().numpy()[0]
+            #  Note: rec_img is a stack of 3 images
+            original_stack_imgs  = state_tensor_img.cpu().numpy()[0]
+            reconstruction_stack = rec_img.cpu().numpy()[0]
 
-        # this could be better
-        ssim_index_1 = ssim(original_stack_imgs[0], reconstruction_stack[0])
-        ssim_index_2 = ssim(original_stack_imgs[1], reconstruction_stack[1])
-        ssim_index_3 = ssim(original_stack_imgs[2], reconstruction_stack[2])
+            # this could be improved somehow
+            ssim_index_1 = ssim(original_stack_imgs[0], reconstruction_stack[0])
+            ssim_index_2 = ssim(original_stack_imgs[1], reconstruction_stack[1])
+            ssim_index_3 = ssim(original_stack_imgs[2], reconstruction_stack[2])
 
-        avr_ssim_total = (ssim_index_1 + ssim_index_2 + ssim_index_3) / 3
+            avr_ssim_total = (ssim_index_1 + ssim_index_2 + ssim_index_3) / 3
 
-        return avr_ssim_total
-
-
+            return avr_ssim_total
 
     def train_policy(self, experiences):
+        self.encoder.train()
+        self.decoder.train()
+        self.actor.train()
+        self.critic.train()
+
         self.learn_counter += 1
 
         states, actions, rewards, next_states, dones = experiences
@@ -200,17 +206,27 @@ class Algorithm:
             self.actor_optimizer.step()
 
             # Update target network params
-            for target_param, param in zip(self.critic_target.parameters(), self.critic.parameters()):
+            for target_param, param in zip(self.critic_target.Q1.parameters(), self.critic.Q1.parameters()):
                 target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
 
-            for target_param, param in zip(self.actor_target.parameters(), self.actor.parameters()):
+            for target_param, param in zip(self.critic_target.Q2.parameters(), self.critic.Q2.parameters()):
                 target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
+
+            for target_param, param in zip(self.actor_target.act_net.parameters(), self.actor.act_net.parameters()):
+                target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
+
+            # the encoders in target networks are the same of main networks so I do not neet update them
+            # for param, target_param in zip(self.actor.encoder_net.parameters(), self.actor_target.encoder_net.parameters()):
+            #     target_param.data.copy_(self.tau_encoder * param.data + (1 - self.tau_encoder) * target_param.data)
+            # for param, target_param in zip(self.critic.encoder_net.parameters(), self.critic_target.encoder_net.parameters()):
+            #     target_param.data.copy_(self.tau_encoder * param.data + (1 - self.tau_encoder) * target_param.data)
+
+
 
 
     def train_predictive_model(self, experiences):
 
         states, actions, _, next_states, _ = experiences
-
         with torch.no_grad():
             # This is my ground truth value
             # state img --> Encoder -->  zt
@@ -234,4 +250,3 @@ class Algorithm:
             optimizer.zero_grad()
             loss_neg_log_likelihood.backward()
             optimizer.step()
-
