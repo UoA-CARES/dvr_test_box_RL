@@ -29,7 +29,7 @@ class Algorithm:
 
         self.gamma = 0.99
         self.tau   = 0.005
-        self.ensemble_size = 10
+        self.ensemble_size = 5
 
         self.learn_counter      = 0
         self.policy_update_freq = 2
