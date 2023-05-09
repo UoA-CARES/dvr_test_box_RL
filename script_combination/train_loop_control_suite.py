@@ -54,8 +54,13 @@ def train (env, model_policy):
 
         next_state, reward_extrinsic, done = frames_stack.step(action)
 
-        #surprise_rate = model_policy.get_surprise_rate(state, action)
-        #novelty_rate  = model_policy.get_novelty_rate(state)
+        if total_step_counter % 50 == 0:
+            render_flag = True
+        else:
+            render_flag = False
+
+        surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, render_flag)
+        logging.info(f" Novelty Rate = {novelty_rate}")
 
         #rew_surprise = surprise_rate
         #rew_novelty  = 1 - novelty_rate
@@ -67,7 +72,7 @@ def train (env, model_policy):
         memory.add(state=state, action=action, reward=total_reward, next_state=next_state, done=done)
         state = next_state
 
-        episode_reward += reward_extrinsic # just for plotting purposes use this reward as it is
+        episode_reward += reward_extrinsic  # just for plotting purposes use this reward as it is
 
         if total_step_counter >= max_steps_exploration:
             for _ in range(G):
@@ -86,6 +91,7 @@ def train (env, model_policy):
             episode_reward = 0
             episode_timesteps = 0
             episode_num += 1
+
     hlp.plot_reward_curve(historical_reward)
 
 
@@ -105,7 +111,8 @@ def main():
     model_policy = Algorithm(
         latent_size=latent_size,
         action_num=action_size,
-        device=device)
+        device=device,
+        k=3)
 
 
     train(env, model_policy)

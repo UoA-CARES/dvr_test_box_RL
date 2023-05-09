@@ -18,7 +18,7 @@ from FrameStack import FrameStack
 def train(env, model_policy, k):
 
     max_steps_training    = 100_000
-    max_steps_exploration = 1_00
+    max_steps_exploration = 1_000
 
     batch_size = 64
     seed       = 571
@@ -57,12 +57,12 @@ def train(env, model_policy, k):
         next_state, reward_extrinsic, done, truncated, info = frames_stack.step(action_env)
 
         if total_step_counter % 50 == 0:
-            plot_flag = True
+            render_flag = True
         else:
-            plot_flag = False
+            render_flag = False
 
         # intrinsic rewards
-        surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, plot_flag)
+        surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, render_flag)
         logging.info(f" Novelty Rate = {novelty_rate}")
 
         # # dopamine   = None  # to include later if reach the goal
@@ -76,7 +76,7 @@ def train(env, model_policy, k):
         memory.add(state=state, action=action, reward=total_reward, next_state=next_state, done=done)
         state = next_state
 
-        episode_reward += reward_extrinsic # just for plotting and evaluation purposes use the  reward as it is
+        episode_reward += reward_extrinsic  # just for plotting and evaluation purposes use the  reward as it is
 
         if total_step_counter >= max_steps_exploration:
             for _ in range(G):

@@ -2,6 +2,9 @@
 import os
 import copy
 
+import logging
+logging.basicConfig(level=logging.INFO)
+
 import matplotlib.pyplot as plt
 
 import torch
@@ -126,9 +129,11 @@ class Algorithm:
             original_stack_imgs  = state_tensor_img.cpu().numpy()[0]  # --> (k , 84 ,84)
             reconstruction_stack = rec_img.cpu().numpy()[0]           # --> (k , 84 ,84)
 
+            # ssim_index_total = ssim(original_stack_imgs, reconstruction_stack, full=False, data_range=original_stack_imgs.max() - original_stack_imgs.min(), channel_axis=0)
+
             ssim_index_total = []
             for original_img, reconstruction_img in zip(original_stack_imgs, reconstruction_stack):
-                ssim_score = ssim(original_img, reconstruction_img, full=False, data_range=original_img.max() - original_img.min())
+                ssim_score = ssim(original_img, reconstruction_img, full=False, data_range=1.0)
                 ssim_index_total.append(ssim_score)
             avr_ssim_total = np.mean(ssim_index_total)
 
@@ -154,10 +159,6 @@ class Algorithm:
         #plt.savefig(f"plot_results/AE-TD3_{env_name}_image_reconstruction.png")
         #plt.show()
         plt.pause(0.01)
-
-
-
-
 
 
     def train_policy(self, experiences):
