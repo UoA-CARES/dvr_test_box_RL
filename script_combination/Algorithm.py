@@ -11,8 +11,7 @@ import torch.nn.functional as F
 import numpy as np
 from cares_reinforcement_learning.util import helpers as hlp
 from skimage.metrics import structural_similarity as ssim
-
-
+from PIL import ImageChops
 
 from networks import Actor
 from networks import Critic
@@ -32,7 +31,7 @@ class Algorithm:
         self.gamma = 0.99
         self.tau   = 0.005
         self.ensemble_size = 10
-        self.k = k # numer of stack frames
+        self.k = k  # numer of stack frames
 
         self.learn_counter      = 0
         self.policy_update_freq = 2
@@ -127,29 +126,37 @@ class Algorithm:
             original_stack_imgs  = state_tensor_img.cpu().numpy()[0]  # --> (k , 84 ,84)
             reconstruction_stack = rec_img.cpu().numpy()[0]           # --> (k , 84 ,84)
 
-            if flag:
-                self.plot_img_reconstruction(original_stack_imgs[2], reconstruction_stack[2])
-
             ssim_index_total = []
             for original_img, reconstruction_img in zip(original_stack_imgs, reconstruction_stack):
-                ssim_index = ssim(original_img, reconstruction_img)
-                ssim_index_total.append(ssim_index)
+                ssim_score = ssim(original_img, reconstruction_img, full=False, data_range=original_img.max() - original_img.min())
+                ssim_index_total.append(ssim_score)
             avr_ssim_total = np.mean(ssim_index_total)
+
+            if flag:
+                self.plot_img_reconstruction(original_stack_imgs[2], reconstruction_stack[2])
 
             return avr_ssim_total
 
     def plot_img_reconstruction(self, original_img, reconstruction_img):
-        plt.subplot(1, 2, 1)
+        plt.subplot(1, 3, 1)
         plt.title("Image Input")
-        plt.imshow(original_img, cmap='gray')
+        plt.imshow(original_img, cmap='gray', vmin=0, vmax=1)
 
-        plt.subplot(1, 2, 2)
+        plt.subplot(1, 3, 2)
         plt.title("Image Reconstruction")
-        plt.imshow(reconstruction_img, cmap='gray')
+        plt.imshow(reconstruction_img, cmap='gray', vmin=0, vmax=1)
+
+        difference = abs(original_img - reconstruction_img)
+        plt.subplot(1, 3, 3)
+        plt.title("Difference")
+        plt.imshow(difference, cmap='gray', vmin=0, vmax=1)
+
+
+
 
         #plt.savefig(f"plot_results/AE-TD3_{env_name}_image_reconstruction.png")
-        #plt.show()
-        plt.pause(0.01)
+        plt.show()
+        #plt.pause(0.01)
 
 
 

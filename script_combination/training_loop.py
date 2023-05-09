@@ -18,7 +18,7 @@ from FrameStack import FrameStack
 def train(env, model_policy, k):
 
     max_steps_training    = 100_000
-    max_steps_exploration = 1_000
+    max_steps_exploration = 1_00
 
     batch_size = 64
     seed       = 571
