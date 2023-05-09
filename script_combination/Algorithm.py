@@ -151,12 +151,9 @@ class Algorithm:
         plt.title("Difference")
         plt.imshow(difference, cmap='gray', vmin=0, vmax=1)
 
-
-
-
         #plt.savefig(f"plot_results/AE-TD3_{env_name}_image_reconstruction.png")
-        plt.show()
-        #plt.pause(0.01)
+        #plt.show()
+        plt.pause(0.01)
 
 
 
