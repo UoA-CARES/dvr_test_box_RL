@@ -40,7 +40,6 @@ def train(env, model_policy):
     episode_num       = 0
 
     state = frames_stack.reset()  # for 3 images
-    state = state.astype(np.uint8)
 
     historical_reward = {"step": [], "episode_reward": []}
 
@@ -72,8 +71,7 @@ def train(env, model_policy):
         total_reward = reward_extrinsic + reward_surprise + reward_novelty
 
         memory.add(state=state, action=action, reward=total_reward, next_state=next_state, done=done)
-        next_state = next_state.astype(np.uint8)  # todo ask this
-        state      = next_state
+        state = next_state
 
         episode_reward += reward_extrinsic  # just for plotting purposes use this reward as it is
 
@@ -91,8 +89,6 @@ def train(env, model_policy):
             historical_reward["episode_reward"].append(episode_reward)
 
             state = frames_stack.reset()
-            state = state.astype(np.uint8)
-
             episode_reward = 0
             episode_timesteps = 0
             episode_num += 1
