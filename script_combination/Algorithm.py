@@ -2,6 +2,8 @@
 import os
 import copy
 
+import matplotlib.pyplot as plt
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,7 +23,7 @@ from networks import EPPM
 
 class Algorithm:
 
-    def __init__(self, latent_size, action_num, device):
+    def __init__(self, latent_size, action_num, device, k):
 
         self.latent_size = latent_size
         self.action_num  = action_num
@@ -29,13 +31,14 @@ class Algorithm:
 
         self.gamma = 0.99
         self.tau   = 0.005
-        self.ensemble_size = 5
+        self.ensemble_size = 10
+        self.k = k # numer of stack frames
 
         self.learn_counter      = 0
         self.policy_update_freq = 2
 
-        self.encoder = Encoder(self.latent_size).to(self.device)
-        self.decoder = Decoder(self.latent_size).to(self.device)
+        self.encoder = Encoder(latent_dim=self.latent_size, k=self.k).to(self.device)
+        self.decoder = Decoder(latent_dim=self.latent_size, k=self.k).to(self.device)
 
         self.actor  = Actor(self.latent_size, self.action_num, self.encoder).to(self.device)
         self.critic = Critic(self.latent_size, self.action_num, self.encoder).to(self.device)
@@ -80,7 +83,7 @@ class Algorithm:
         #self.actor.train()
         return action
 
-    def get_surprise_rate(self, state, action):
+    def get_intrinsic_values(self, state, action, plot_flag):
 
         with torch.no_grad():
             state_tensor  = torch.FloatTensor(state).to(self.device)
@@ -88,53 +91,70 @@ class Algorithm:
             action_tensor = torch.FloatTensor(action).to(self.device)
             action_tensor = action_tensor.unsqueeze(0)
 
+            surprise_rate = self.get_surprise_rate(state_tensor, action_tensor)
+            novelty_rate  = self.get_novelty_rate(state_tensor, plot_flag)
+
+            return surprise_rate, novelty_rate
+
+
+    def get_surprise_rate(self, state_tensor, action_tensor):
+        with torch.no_grad():
             latent_state  = self.encoder(state_tensor, detach=True)
-
             predict_mean_set, predict_std_set = [], []
-
             for network in self.eppm:
                 network.eval()
                 predicted_distribution = network(latent_state, action_tensor)
-
                 mean = predicted_distribution.mean
                 std  = predicted_distribution.stddev
-
                 predict_mean_set.append(mean.detach().cpu().numpy())
                 predict_std_set.append(std.detach().cpu().numpy())
 
             ensemble_means = np.concatenate(predict_mean_set, axis=0)
             ensemble_stds  = np.concatenate(predict_std_set, axis=0)
 
-            avr_mean = np.mean(ensemble_means, axis=0)
-            avr_std  = np.mean(ensemble_stds, axis=0)
-
+            # avr_mean = np.mean(ensemble_means, axis=0)
+            # avr_std  = np.mean(ensemble_stds, axis=0)
             avr_std_total = np.mean(ensemble_stds)
 
             return avr_std_total
 
-    def get_novelty_rate(self, state):
+    def get_novelty_rate(self, state_tensor_img, flag):
 
-        #self.encoder.eval()
-        #self.decoder.eval()
         with torch.no_grad():
-            state_tensor_img = torch.FloatTensor(state).to(self.device)
-            state_tensor_img = state_tensor_img.unsqueeze(0)
-
             z_vector = self.encoder(state_tensor_img)
-            rec_img  = self.decoder(z_vector)
+            rec_img  = self.decoder(z_vector) # Note: rec_img is a stack of k images --> (1, k , 84 ,84), # Normally k =3
 
-            #  Note: rec_img is a stack of 3 images
-            original_stack_imgs  = state_tensor_img.cpu().numpy()[0]
-            reconstruction_stack = rec_img.cpu().numpy()[0]
+            original_stack_imgs  = state_tensor_img.cpu().numpy()[0]  # --> (k , 84 ,84)
+            reconstruction_stack = rec_img.cpu().numpy()[0]           # --> (k , 84 ,84)
 
-            # this could be improved somehow
-            ssim_index_1 = ssim(original_stack_imgs[0], reconstruction_stack[0])
-            ssim_index_2 = ssim(original_stack_imgs[1], reconstruction_stack[1])
-            ssim_index_3 = ssim(original_stack_imgs[2], reconstruction_stack[2])
+            if flag:
+                self.plot_img_reconstruction(original_stack_imgs[2], reconstruction_stack[2])
 
-            avr_ssim_total = (ssim_index_1 + ssim_index_2 + ssim_index_3) / 3
+            ssim_index_total = []
+            for original_img, reconstruction_img in zip(original_stack_imgs, reconstruction_stack):
+                ssim_index = ssim(original_img, reconstruction_img)
+                ssim_index_total.append(ssim_index)
+            avr_ssim_total = np.mean(ssim_index_total)
 
             return avr_ssim_total
+
+    def plot_img_reconstruction(self, original_img, reconstruction_img):
+        plt.subplot(1, 2, 1)
+        plt.title("Image Input")
+        plt.imshow(original_img, cmap='gray')
+
+        plt.subplot(1, 2, 2)
+        plt.title("Image Reconstruction")
+        plt.imshow(reconstruction_img, cmap='gray')
+
+        #plt.savefig(f"plot_results/AE-TD3_{env_name}_image_reconstruction.png")
+        #plt.show()
+        plt.pause(0.01)
+
+
+
+
+
 
     def train_policy(self, experiences):
         self.encoder.train()
@@ -216,11 +236,6 @@ class Algorithm:
                 target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
 
             # the encoders in target networks are the same of main networks so I do not neet update them
-            # for param, target_param in zip(self.actor.encoder_net.parameters(), self.actor_target.encoder_net.parameters()):
-            #     target_param.data.copy_(self.tau_encoder * param.data + (1 - self.tau_encoder) * target_param.data)
-            # for param, target_param in zip(self.critic.encoder_net.parameters(), self.critic_target.encoder_net.parameters()):
-            #     target_param.data.copy_(self.tau_encoder * param.data + (1 - self.tau_encoder) * target_param.data)
-
 
 
 

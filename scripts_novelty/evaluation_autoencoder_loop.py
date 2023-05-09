@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO)
 import matplotlib.pyplot as plt
 
 from Novelty import Deep_Novelty
-from skimage.metrics import structural_similarity as ssim
+from skimage.metrics import structural_similarity as ssim, mean_squared_error
 
 
 def preprocessing_image(image_array):
@@ -39,6 +39,9 @@ def evaluation(env, autoencoder_model):
 
     #difference = ((input_img - reconstruction_img) * 255).astype("uint8")
     difference = (input_img - reconstruction_img)
+
+    mse_index = mean_squared_error(input_img, reconstruction_img)
+    print("MSE similarity index", mse_index)
 
     ssim_index = ssim(input_img, reconstruction_img, data_range=input_img.max() - input_img.min())
     print("Structural similarity index", ssim_index)
