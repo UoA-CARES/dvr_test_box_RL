@@ -56,22 +56,21 @@ def train(env, model_policy, k):
 
         next_state, reward_extrinsic, done, truncated, info = frames_stack.step(action_env)
 
-        if total_step_counter % 50 == 0:
+        if total_step_counter % 100 == 0:
             render_flag = True
         else:
             render_flag = False
 
-        # intrinsic rewards
         surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, render_flag)
-        logging.info(f" Novelty Rate = {novelty_rate}")
 
+        # intrinsic rewards
         # # dopamine   = None  # to include later if reach the goal
-        # rew_surprise = surprise_rate
-        # rew_novelty  = 1 - novelty_rate
-        # #logging.info(f"Surprise Rate = {rew_surprise},  Novelty Rate = {rew_novelty}, Normal Reward = {reward_extrinsic}")
+        reward_surprise = (surprise_rate)
+        reward_novelty  = (1 - novelty_rate)
+        logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
 
         # Total Reward
-        total_reward = reward_extrinsic #+ rew_surprise + rew_novelty
+        total_reward = reward_extrinsic + reward_surprise + reward_novelty
 
         memory.add(state=state, action=action, reward=total_reward, next_state=next_state, done=done)
         state = next_state
@@ -82,7 +81,8 @@ def train(env, model_policy, k):
             for _ in range(G):
                 experiences = memory.sample(batch_size)
                 model_policy.train_policy(experiences)
-            #model_policy.train_predictive_model(experiences)
+
+            model_policy.train_predictive_model(experiences)
 
         if done or truncated:
             logging.info(f"Total T:{total_step_counter + 1} Episode {episode_num + 1} was completed with {episode_timesteps} steps taken and a Reward= {episode_reward:.3f}")
