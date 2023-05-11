@@ -1,27 +1,36 @@
 
-import cv2
 import logging
 logging.basicConfig(level=logging.INFO)
-from cares_reinforcement_learning.util import helpers as hlp
 
 import torch
 import numpy as np
 from dm_control import suite
 
+from cares_reinforcement_learning.util import MemoryBuffer
+from cares_reinforcement_learning.util import helpers as hlp
+
 from Algorithm import Algorithm
 from FrameStack_DMCS import FrameStack
 
-from cares_reinforcement_learning.util import MemoryBuffer
+import pandas as pd
+import matplotlib.pyplot as plt
+
+def plot_reward_curve(data_reward, filename):
+    data = pd.DataFrame.from_dict(data_reward)
+    data.plot(x='step', y='episode_reward', title="Reward Curve")
+    plt.title(filename)
+    plt.show()
 
 
-def train(env, model_policy):
+def train(env, model_policy, file_name, intrinsic_on):
+
     max_steps_training    = 100_000
     max_steps_exploration = 1_000
 
-    batch_size = 64
-    seed = 571
-    G = 10
-    k = 3
+    batch_size = 100
+    seed       = 571
+    G          = 5
+    k          = 3
 
     action_spec      = env.action_spec()
     action_size      = action_spec.shape[0]
@@ -30,7 +39,6 @@ def train(env, model_policy):
 
     torch.manual_seed(seed)
     np.random.seed(seed)
-    # env.action_space.seed(seed)
 
     memory       = MemoryBuffer()
     frames_stack = FrameStack(env, k, seed)
@@ -50,7 +58,7 @@ def train(env, model_policy):
             logging.info(f"Running Exploration Steps {total_step_counter}/{max_steps_exploration}")
             action = np.random.uniform(min_action_value, max_action_value, size=action_size)
         else:
-            action = model_policy.get_action_from_policy(state)  # no normalization need for action already [-1, 1]
+            action = model_policy.get_action_from_policy(state)  # no normalization need for action, already [-1, 1]
 
         next_state, reward_extrinsic, done = frames_stack.step(action)
 
@@ -59,16 +67,18 @@ def train(env, model_policy):
         else:
             render_flag = False
 
-        surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, render_flag)
-
         # intrinsic rewards
-        # # dopamine   = None  # to include later if reach the goal
-        reward_surprise = (surprise_rate)
+        surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, render_flag)
+        reward_surprise = surprise_rate
         reward_novelty  = (1 - novelty_rate)
         logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
 
         # Total Reward
-        total_reward = reward_extrinsic + reward_surprise + reward_novelty
+        if intrinsic_on:
+            total_reward = reward_extrinsic + reward_surprise + reward_novelty
+        else:
+            total_reward = reward_extrinsic
+
 
         memory.add(state=state, action=action, reward=total_reward, next_state=next_state, done=done)
         state = next_state
@@ -80,7 +90,8 @@ def train(env, model_policy):
                 experiences = memory.sample(batch_size)
                 model_policy.train_policy(experiences)
 
-            model_policy.train_predictive_model(experiences)
+            if intrinsic_on:
+                model_policy.train_predictive_model(experiences)
 
         if done:
             logging.info(f"Total T:{total_step_counter + 1} Episode {episode_num + 1} was completed with {episode_timesteps} steps taken and a Reward= {episode_reward:.3f}")
@@ -93,14 +104,19 @@ def train(env, model_policy):
             episode_timesteps = 0
             episode_num += 1
 
-    hlp.plot_reward_curve(historical_reward)
+    model_policy.save_models(filename=file_name)
+    plot_reward_curve(historical_reward, filename=file_name)
 
 
 def main():
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    domain_name = "cartpole"
-    task_name   = "balance"
+    # Domain = cartpole, cheetah, reacher
+    # task   = balance , run,     easy
+
+    domain_name = "reacher"
+    task_name   = "easy"
     seed        = 571
     env         = suite.load(domain_name, task_name, task_kwargs={'random': seed})
 
@@ -116,8 +132,11 @@ def main():
         k=3)
 
 
-    train(env, model_policy)
 
+    file_name = domain_name + "_" + task_name + "_" +  "TD3_AE_Detach_False"
+    intrinsic_on = False
+
+    train(env, model_policy, file_name, intrinsic_on)
 
 
 if __name__ == '__main__':

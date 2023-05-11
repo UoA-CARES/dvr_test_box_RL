@@ -1,5 +1,4 @@
 
-import cv2
 import gym
 import torch
 import numpy as np
@@ -20,9 +19,9 @@ def train(env, model_policy, k):
     max_steps_training    = 100_000
     max_steps_exploration = 1_000
 
-    batch_size = 64
+    batch_size = 100
     seed       = 571
-    G          = 10
+    G          = 5
     k          = k
 
     min_action_value = env.action_space.low[0]
@@ -61,16 +60,15 @@ def train(env, model_policy, k):
         else:
             render_flag = False
 
-        surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, render_flag)
-
         # intrinsic rewards
-        # # dopamine   = None  # to include later if reach the goal
-        reward_surprise = (surprise_rate)
+        surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, render_flag)
+        reward_surprise = surprise_rate
         reward_novelty  = (1 - novelty_rate)
-        logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
+        #logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
 
         # Total Reward
-        total_reward = reward_extrinsic + reward_surprise + reward_novelty
+        #total_reward = reward_extrinsic + reward_surprise + reward_novelty
+        total_reward = reward_extrinsic
 
         memory.add(state=state, action=action, reward=total_reward, next_state=next_state, done=done)
         state = next_state
@@ -81,8 +79,7 @@ def train(env, model_policy, k):
             for _ in range(G):
                 experiences = memory.sample(batch_size)
                 model_policy.train_policy(experiences)
-
-            model_policy.train_predictive_model(experiences)
+            #model_policy.train_predictive_model(experiences)
 
         if done or truncated:
             logging.info(f"Total T:{total_step_counter + 1} Episode {episode_num + 1} was completed with {episode_timesteps} steps taken and a Reward= {episode_reward:.3f}")

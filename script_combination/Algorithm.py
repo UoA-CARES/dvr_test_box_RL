@@ -31,10 +31,10 @@ class Algorithm:
         self.action_num  = action_num
         self.device      = device
 
+        self.k     = k  # numer of stack frames
         self.gamma = 0.99
         self.tau   = 0.005
         self.ensemble_size = 10
-        self.k = k  # numer of stack frames
 
         self.learn_counter      = 0
         self.policy_update_freq = 2
@@ -47,6 +47,7 @@ class Algorithm:
 
         self.actor_target  = Actor(self.latent_size, self.action_num, self.encoder).to(self.device)
         self.critic_target = Critic(self.latent_size, self.action_num, self.encoder).to(self.device)
+
         self.critic_target.load_state_dict(self.critic.state_dict())
         self.actor_target.load_state_dict(self.actor.state_dict())
 
@@ -143,6 +144,7 @@ class Algorithm:
             return avr_ssim_total
 
     def plot_img_reconstruction(self, original_img, reconstruction_img):
+
         plt.subplot(1, 3, 1)
         plt.title("Image Input")
         plt.imshow(original_img, cmap='gray', vmin=0, vmax=1)
@@ -222,7 +224,7 @@ class Algorithm:
 
         # Update Actor
         if self.learn_counter % self.policy_update_freq == 0:
-            actor_q_one, actor_q_two = self.critic(states, self.actor(states, detach_encoder=True),  detach_encoder=True)
+            actor_q_one, actor_q_two = self.critic(states, self.actor(states, detach_encoder=False),  detach_encoder=False)
             actor_q_values = torch.minimum(actor_q_one, actor_q_two)
             actor_loss = -actor_q_values.mean()
 
@@ -240,7 +242,7 @@ class Algorithm:
             for target_param, param in zip(self.actor_target.act_net.parameters(), self.actor.act_net.parameters()):
                 target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
 
-            # the encoders in target networks are the same of main networks so I do not neet update them
+            # the encoders in target networks are the same of main networks, so I will not update them
 
 
 
@@ -270,3 +272,19 @@ class Algorithm:
             optimizer.zero_grad()
             loss_neg_log_likelihood.backward()
             optimizer.step()
+
+    def save_models(self, filename):
+        dir_exists = os.path.exists("models")
+
+        if not dir_exists:
+            os.makedirs("models")
+
+        torch.save(self.actor.state_dict(),  f'models/{filename}_actor.pht')
+        torch.save(self.critic.state_dict(), f'models/{filename}_critic.pht')
+
+        torch.save(self.encoder.state_dict(), f'models/{filename}_encoder.pht')
+        torch.save(self.decoder.state_dict(), f'models/{filename}_decoder.pht')
+
+        torch.save(self.eppm.state_dict(), f'models/{filename}_ensemble.pht')  # no sure if this is the correct way to solve ensemble
+
+        print("models has been saved...")
