@@ -136,12 +136,16 @@ class Algorithm:
             for original_img, reconstruction_img in zip(original_stack_imgs, reconstruction_stack):
                 ssim_score = ssim(original_img, reconstruction_img, full=False, data_range=1.0)
                 ssim_index_total.append(ssim_score)
-            avr_ssim_total = np.mean(ssim_index_total)
+
+            #avr_ssim_total = np.mean(ssim_index_total)
+            sum_ssim_total = np.sum(ssim_index_total)
+
+            novelty_rate = 3 - sum_ssim_total
 
             if flag:
                 self.plot_img_reconstruction(original_stack_imgs[2], reconstruction_stack[2])
 
-            return avr_ssim_total
+            return novelty_rate
 
     def plot_img_reconstruction(self, original_img, reconstruction_img):
 

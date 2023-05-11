@@ -70,7 +70,7 @@ def train(env, model_policy, file_name, intrinsic_on):
         # intrinsic rewards
         surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, render_flag)
         reward_surprise = surprise_rate
-        reward_novelty  = (1 - novelty_rate)
+        reward_novelty  = novelty_rate
         logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
 
         # Total Reward
@@ -133,8 +133,8 @@ def main():
 
 
 
-    file_name = domain_name + "_" + task_name + "_" +  "TD3_AE_Detach_False"
-    intrinsic_on = False
+    file_name = domain_name + "_" + task_name + "_" + "TD3_AE_Detach_False"
+    intrinsic_on = True
 
     train(env, model_policy, file_name, intrinsic_on)
 
