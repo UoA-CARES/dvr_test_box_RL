@@ -228,7 +228,7 @@ class Algorithm:
 
         # Update Actor
         if self.learn_counter % self.policy_update_freq == 0:
-            actor_q_one, actor_q_two = self.critic(states, self.actor(states, detach_encoder=False),  detach_encoder=False)
+            actor_q_one, actor_q_two = self.critic(states, self.actor(states, detach_encoder=True),  detach_encoder=True)
             actor_q_values = torch.minimum(actor_q_one, actor_q_two)
             actor_loss = -actor_q_values.mean()
 
