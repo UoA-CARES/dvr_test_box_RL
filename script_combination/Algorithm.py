@@ -31,7 +31,7 @@ class Algorithm:
         self.action_num  = action_num
         self.device      = device
 
-        self.k     = k  # numer of stack frames
+        self.k     = k * 3  # numer of stack frames, 3 if I am using color images
         self.gamma = 0.99
         self.tau   = 0.005
         self.ensemble_size = 10
@@ -86,7 +86,7 @@ class Algorithm:
         #self.actor.train()
         return action
 
-    def get_intrinsic_values(self, state, action, plot_flag):
+    def get_intrinsic_values(self, state, action, next_state, plot_flag):
 
         with torch.no_grad():
             state_tensor  = torch.FloatTensor(state).to(self.device)
@@ -94,15 +94,17 @@ class Algorithm:
             action_tensor = torch.FloatTensor(action).to(self.device)
             action_tensor = action_tensor.unsqueeze(0)
 
-            surprise_rate = self.get_surprise_rate(state_tensor, action_tensor)
+            surprise_rate = self.get_surprise_rate(state_tensor, action_tensor, next_state)
             novelty_rate  = self.get_novelty_rate(state_tensor, plot_flag)
 
             return surprise_rate, novelty_rate
 
 
-    def get_surprise_rate(self, state_tensor, action_tensor):
+    def get_surprise_rate(self, state_tensor_img, action_tensor, next_state_array_img):
+
         with torch.no_grad():
-            latent_state  = self.encoder(state_tensor, detach=True)
+            latent_state  = self.encoder(state_tensor_img, detach=True)
+
             predict_mean_set, predict_std_set = [], []
             for network in self.eppm:
                 network.eval()
@@ -112,60 +114,88 @@ class Algorithm:
                 predict_mean_set.append(mean.detach().cpu().numpy())
                 predict_std_set.append(std.detach().cpu().numpy())
 
-            ensemble_means = np.concatenate(predict_mean_set, axis=0)
-            ensemble_stds  = np.concatenate(predict_std_set, axis=0)
+            ensemble_prediction_means = np.concatenate(predict_mean_set, axis=0)
+            ensemble_prediction_stds  = np.concatenate(predict_std_set, axis=0)
 
-            # avr_mean = np.mean(ensemble_means, axis=0)
-            # avr_std  = np.mean(ensemble_stds, axis=0)
-            avr_std_total = np.mean(ensemble_stds)
+            z_next_latent_prediction = np.mean(ensemble_prediction_means, axis=0)
+            uncertainty_prediction   = np.mean(ensemble_prediction_stds, axis=0) # std of each element in the z _vector
 
-            return avr_std_total
+            avr_uncertainty = np.mean(uncertainty_prediction) # avr uncertainty in the prediction
+
+            z_next_latent_prediction_tensor = torch.FloatTensor(z_next_latent_prediction).to(self.device)
+
+            next_state_rec_img       = self.decoder(z_next_latent_prediction_tensor)
+            reconstr_stack_next_img  = next_state_rec_img.cpu().numpy()[0]  # --> (k , 84 ,84)
+
+            ssim_index_total = ssim(next_state_array_img, reconstr_stack_next_img, full=False, data_range=1, channel_axis=0)
+            surprise_rate    = (1 - ssim_index_total) + avr_uncertainty
+
+            return surprise_rate
 
     def get_novelty_rate(self, state_tensor_img, flag):
 
         with torch.no_grad():
             z_vector = self.encoder(state_tensor_img)
-            rec_img  = self.decoder(z_vector) # Note: rec_img is a stack of k images --> (1, k , 84 ,84), # Normally k =3
+            rec_img  = self.decoder(z_vector) # Note: rec_img is a stack of k images --> (1, k , 84 ,84),
 
             original_stack_imgs  = state_tensor_img.cpu().numpy()[0]  # --> (k , 84 ,84)
             reconstruction_stack = rec_img.cpu().numpy()[0]           # --> (k , 84 ,84)
 
-            # ssim_index_total = ssim(original_stack_imgs, reconstruction_stack, full=False, data_range=original_stack_imgs.max() - original_stack_imgs.min(), channel_axis=0)
 
-            ssim_index_total = []
-            for original_img, reconstruction_img in zip(original_stack_imgs, reconstruction_stack):
-                ssim_score = ssim(original_img, reconstruction_img, full=False, data_range=1.0)
-                ssim_index_total.append(ssim_score)
-
-            #avr_ssim_total = np.mean(ssim_index_total)
-            sum_ssim_total = np.sum(ssim_index_total)
-
-            novelty_rate = 3 - sum_ssim_total
+            ssim_index_total = ssim(original_stack_imgs, reconstruction_stack, full=False, data_range=original_stack_imgs.max() - original_stack_imgs.min(), channel_axis=0)
+            novelty_rate     = 1 - ssim_index_total
 
             if flag:
-                self.plot_img_reconstruction(original_stack_imgs[2], reconstruction_stack[2])
+                self.plot_img_reconstruction(original_stack_imgs, reconstruction_stack)
 
             return novelty_rate
 
     def plot_img_reconstruction(self, original_img, reconstruction_img):
 
-        plt.subplot(1, 3, 1)
-        plt.title("Image Input")
-        plt.imshow(original_img, cmap='gray', vmin=0, vmax=1)
+        original_img       = np.moveaxis(original_img, 0, -1)
+        reconstruction_img = np.moveaxis(reconstruction_img, 0, -1)
 
-        plt.subplot(1, 3, 2)
-        plt.title("Image Reconstruction")
-        plt.imshow(reconstruction_img, cmap='gray', vmin=0, vmax=1)
+        original_img       = np.array_split(original_img, 3, axis=2)
+        reconstruction_img = np.array_split(reconstruction_img, 3, axis=2)
 
-        difference = abs(original_img - reconstruction_img)
-        plt.subplot(1, 3, 3)
-        plt.title("Difference")
-        plt.imshow(difference, cmap='gray', vmin=0, vmax=1)
+        plt.subplot(2, 3, 1)
+        plt.title("Image Input one")
+        #plt.imshow(original_img[0], vmin=0, vmax=1)
+        plt.imshow(original_img[0])
+
+        plt.subplot(2, 3, 2)
+        plt.title("Image Input two")
+        #plt.imshow(original_img[1], vmin=0, vmax=1)
+        plt.imshow(original_img[1])
+
+        plt.subplot(2, 3, 3)
+        plt.title("Image Input three")
+        #plt.imshow(original_img[2], vmin=0, vmax=1)
+        plt.imshow(original_img[2])
+
+        plt.subplot(2, 3, 4)
+        plt.title("Image Reconstruction one")
+        #plt.imshow(reconstruction_img[0], vmin=0, vmax=1)
+        plt.imshow(reconstruction_img[0])
+
+        plt.subplot(2, 3, 5)
+        plt.title("Image Reconstruction two")
+        #plt.imshow(reconstruction_img[1], vmin=0, vmax=1)
+        plt.imshow(reconstruction_img[1])
+
+        plt.subplot(2, 3, 6)
+        plt.title("Image Reconstruction three")
+        #plt.imshow(reconstruction_img[2], vmin=0, vmax=1)
+        plt.imshow(reconstruction_img[2])
+
+        # difference = abs(original_img[0] - reconstruction_img[0])
+        # plt.subplot(1, 3, 3)
+        # plt.title("Difference")
+        # plt.imshow(difference, vmin=0, vmax=1)
 
         #plt.savefig(f"plot_results/AE-TD3_{env_name}_image_reconstruction.png")
         #plt.show()
         plt.pause(0.01)
-
 
     def train_policy(self, experiences):
         self.encoder.train()
@@ -248,26 +278,22 @@ class Algorithm:
 
             # the encoders in target networks are the same of main networks, so I will not update them
 
-
-
     def train_predictive_model(self, experiences):
 
         states, actions, _, next_states, _ = experiences
-        with torch.no_grad():
-            # This is my ground truth value
-            # state img --> Encoder -->  zt
-            # Next state img --> Encoder --> next zt
-            states      = torch.FloatTensor(np.asarray(states)).to(self.device)
-            actions     = torch.FloatTensor(np.asarray(actions)).to(self.device)
-            next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
 
+        states      = torch.FloatTensor(np.asarray(states)).to(self.device)
+        actions     = torch.FloatTensor(np.asarray(actions)).to(self.device)
+        next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
+
+        with torch.no_grad():
             latent_state      = self.encoder(states, detach=True)
             latent_next_state = self.encoder(next_states, detach=True)
 
         for predictive_network, optimizer in zip(self.eppm, self.eppm_optimizers):
             predictive_network.train()
 
-            # Get the Prediction of each model
+            #Get the Prediction of each model
             prediction_distribution = predictive_network(latent_state, actions)
             loss_neg_log_likelihood = - prediction_distribution.log_prob(latent_next_state)
             loss_neg_log_likelihood = torch.mean(loss_neg_log_likelihood)

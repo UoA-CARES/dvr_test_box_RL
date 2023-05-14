@@ -7,7 +7,6 @@ import numpy as np
 from dm_control import suite
 
 from cares_reinforcement_learning.util import MemoryBuffer
-from cares_reinforcement_learning.util import helpers as hlp
 
 from Algorithm import Algorithm
 from FrameStack_DMCS import FrameStack
@@ -27,7 +26,7 @@ def train(env, model_policy, file_name, intrinsic_on):
     max_steps_training    = 100_000
     max_steps_exploration = 1_000
 
-    batch_size = 100
+    batch_size = 64
     seed       = 571
     G          = 5
     k          = 3
@@ -47,7 +46,7 @@ def train(env, model_policy, file_name, intrinsic_on):
     episode_reward    = 0
     episode_num       = 0
 
-    state = frames_stack.reset()  # for 3 images
+    state = frames_stack.reset()  # for 3 images with color
 
     historical_reward = {"step": [], "episode_reward": []}
 
@@ -62,20 +61,28 @@ def train(env, model_policy, file_name, intrinsic_on):
 
         next_state, reward_extrinsic, done = frames_stack.step(action)
 
-        if total_step_counter % 100 == 0:
+        if total_step_counter % 200 == 0:
             render_flag = True
         else:
             render_flag = False
 
         # intrinsic rewards
-        surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, render_flag)
-        reward_surprise = surprise_rate
-        reward_novelty  = novelty_rate
-        logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
+        a = 5
+        b = 10
+
+        surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, next_state, render_flag)
+        reward_surprise = surprise_rate * a
+        reward_novelty  = novelty_rate  * b
+
+
 
         # Total Reward
         if intrinsic_on:
-            total_reward = reward_extrinsic + reward_surprise + reward_novelty
+            if total_step_counter >= max_steps_exploration:
+                logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
+                total_reward = reward_extrinsic +  reward_surprise +  reward_novelty
+            else:
+                total_reward = reward_extrinsic
         else:
             total_reward = reward_extrinsic
 
@@ -117,6 +124,7 @@ def main():
 
     domain_name = "reacher"
     task_name   = "easy"
+
     seed        = 571
     env         = suite.load(domain_name, task_name, task_kwargs={'random': seed})
 
@@ -131,11 +139,9 @@ def main():
         device=device,
         k=3)
 
-
-
-    file_name = domain_name + "_" + task_name + "_" + "TD3_AE_Detach_False"
     intrinsic_on = True
 
+    file_name = domain_name + "_" + task_name + "_" + "TD3_AE_Detach_True" + "_Intrinsic_" + str(intrinsic_on)
     train(env, model_policy, file_name, intrinsic_on)
 
 
