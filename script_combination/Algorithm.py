@@ -25,13 +25,14 @@ from networks import EPPM
 
 class Algorithm:
 
-    def __init__(self, latent_size, action_num, device, k):
+    def __init__(self, latent_size, action_num, device, k, color=True):
 
         self.latent_size = latent_size
         self.action_num  = action_num
         self.device      = device
 
-        self.k     = k * 3  # numer of stack frames, 3 if I am using color images
+        self.k = k*3 if color is True else k  # numer of stack frames, K*3  if I am using color images
+
         self.gamma = 0.99
         self.tau   = 0.005
         self.ensemble_size = 10
@@ -127,7 +128,8 @@ class Algorithm:
             next_state_rec_img       = self.decoder(z_next_latent_prediction_tensor)
             reconstr_stack_next_img  = next_state_rec_img.cpu().numpy()[0]  # --> (k , 84 ,84)
 
-            ssim_index_total = ssim(next_state_array_img, reconstr_stack_next_img, full=False, data_range=1, channel_axis=0)
+            target_images    = next_state_array_img / 255
+            ssim_index_total = ssim(target_images, reconstr_stack_next_img, full=False, data_range=1, channel_axis=0)
             surprise_rate    = (1 - ssim_index_total) + avr_uncertainty
 
             return surprise_rate
@@ -141,9 +143,9 @@ class Algorithm:
             original_stack_imgs  = state_tensor_img.cpu().numpy()[0]  # --> (k , 84 ,84)
             reconstruction_stack = rec_img.cpu().numpy()[0]           # --> (k , 84 ,84)
 
-
-            ssim_index_total = ssim(original_stack_imgs, reconstruction_stack, full=False, data_range=original_stack_imgs.max() - original_stack_imgs.min(), channel_axis=0)
-            novelty_rate     = 1 - ssim_index_total
+            target_images     = original_stack_imgs / 255
+            ssim_index_total  = ssim(target_images, reconstruction_stack, full=False, data_range=original_stack_imgs.max() - original_stack_imgs.min(), channel_axis=0)
+            novelty_rate      = 1 - ssim_index_total
 
             if flag:
                 self.plot_img_reconstruction(original_stack_imgs, reconstruction_stack)
@@ -245,7 +247,9 @@ class Algorithm:
         # Update Autoencoder
         z_vector = self.encoder(states)
         rec_obs  = self.decoder(z_vector)
-        rec_loss = F.mse_loss(states, rec_obs)
+
+        target_images = states / 255 # this because the images 0- 255 and the prediction is [0-1], I did not normalized before to save experiences as Unit8
+        rec_loss      = F.mse_loss(target_images, rec_obs)
 
         latent_loss = (0.5 * z_vector.pow(2).sum(1)).mean()  # add L2 penalty on latent representation
         ae_loss     = rec_loss + 1e-6 * latent_loss

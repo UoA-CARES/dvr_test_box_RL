@@ -1,6 +1,9 @@
 
 import gym
+import time
 import torch
+import random
+
 import numpy as np
 
 import logging
@@ -10,26 +13,29 @@ from cares_reinforcement_learning.util import MemoryBuffer
 from cares_reinforcement_learning.util import helpers as hlp
 
 from Algorithm import Algorithm
-from FrameStack import FrameStack
+from FrameStack_3CH import FrameStack
 
 
-
-def train(env, model_policy, k):
+def train(env, model_policy,  file_name, intrinsic_on, k):
 
     max_steps_training    = 100_000
-    max_steps_exploration = 1_000
+    max_steps_exploration = 300_000
 
-    batch_size = 100
-    seed       = 571
-    G          = 5
+    batch_size = 128
+    seed       = 1 # 571 seed gives no that great results
+    G          = 10
     k          = k
 
     min_action_value = env.action_space.low[0]
     max_action_value = env.action_space.high[0]
 
+    #-----------------------------------#
     torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
+    random.seed(seed)
     env.action_space.seed(seed)
+    # -----------------------------------#
 
     memory       = MemoryBuffer()
     frames_stack = FrameStack(env, k, seed)
@@ -37,10 +43,10 @@ def train(env, model_policy, k):
     episode_timesteps = 0
     episode_reward    = 0
     episode_num       = 0
-
-    state = frames_stack.reset()  # for k images
-
     historical_reward = {"step": [], "episode_reward": []}
+
+    start_time = time.time()
+    state = frames_stack.reset()  # for k images
 
     for total_step_counter in range(int(max_steps_training)):
         episode_timesteps += 1
@@ -55,20 +61,25 @@ def train(env, model_policy, k):
 
         next_state, reward_extrinsic, done, truncated, info = frames_stack.step(action_env)
 
-        if total_step_counter % 100 == 0:
-            render_flag = True
+        if total_step_counter % 200 == 0:
+            #render_flag = True
+            render_flag = False
         else:
             render_flag = False
 
-        # intrinsic rewards
-        surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, render_flag)
-        reward_surprise = surprise_rate
-        reward_novelty  = (1 - novelty_rate)
-        #logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
+        if intrinsic_on:
+            # intrinsic rewards
+            a = 1
+            b = 1
+            surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, next_state, render_flag)
+            reward_surprise = surprise_rate * a
+            reward_novelty  = novelty_rate  * b
 
-        # Total Reward
-        #total_reward = reward_extrinsic + reward_surprise + reward_novelty
-        total_reward = reward_extrinsic
+            # logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
+            total_reward = reward_extrinsic + reward_surprise + reward_novelty
+
+        else:
+            total_reward = reward_extrinsic
 
         memory.add(state=state, action=action, reward=total_reward, next_state=next_state, done=done)
         state = next_state
@@ -76,14 +87,20 @@ def train(env, model_policy, k):
         episode_reward += reward_extrinsic  # just for plotting and evaluation purposes use the  reward as it is
 
         if total_step_counter >= max_steps_exploration:
-            for _ in range(G):
+            num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
+            for _ in range(num_updates):
                 experiences = memory.sample(batch_size)
                 model_policy.train_policy(experiences)
-            #model_policy.train_predictive_model(experiences)
+
+            if intrinsic_on:
+                experiences = memory.sample(batch_size)
+                model_policy.train_predictive_model(experiences)
 
         if done or truncated:
-            logging.info(f"Total T:{total_step_counter + 1} Episode {episode_num + 1} was completed with {episode_timesteps} steps taken and a Reward= {episode_reward:.3f}")
+            episode_duration = time.time() - start_time
+            start_time       = time.time()
 
+            logging.info(f"Total T:{total_step_counter + 1} | Episode {episode_num + 1} was completed with {episode_timesteps} steps | Reward= {episode_reward:.3f} | Duration= {episode_duration:.2f} Seg")
             historical_reward["step"].append(total_step_counter)
             historical_reward["episode_reward"].append(episode_reward)
 
@@ -91,8 +108,9 @@ def train(env, model_policy, k):
             state = frames_stack.reset()
             episode_reward    = 0
             episode_timesteps = 0
-            episode_num += 1
+            episode_num       += 1
 
+    model_policy.save_models(filename=file_name)
     hlp.plot_reward_curve(historical_reward)
 
 
@@ -109,9 +127,13 @@ def main():
         latent_size=latent_size,
         action_num=action_size,
         device=device,
-        k=number_stack_frames)
+        k=number_stack_frames,
+        color=True)
 
-    train(env, model_policy, number_stack_frames)
+    intrinsic_on = False
+    file_name    = env_gym_name  + "_" + "TD3_AE_Detach_False" + "_Intrinsic_" + str(intrinsic_on)
+
+    train(env, model_policy, file_name, intrinsic_on, number_stack_frames)
 
 
 if __name__ == '__main__':

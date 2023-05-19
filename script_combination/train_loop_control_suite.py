@@ -1,4 +1,3 @@
-
 import cv2
 import time
 import random
@@ -33,7 +32,7 @@ def train(env, model_policy, file_name, intrinsic_on, seed):
 
     batch_size = 128
     seed       = seed
-    G          = 1
+    G          = 10
     k          = 3
     # ------------------------------------#
 
@@ -107,7 +106,6 @@ def train(env, model_policy, file_name, intrinsic_on, seed):
 
         if total_step_counter >= max_steps_exploration:
             num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
-
             for _ in range(num_updates):
                 experiences = memory.sample(batch_size)
                 model_policy.train_policy(experiences)
@@ -128,16 +126,15 @@ def train(env, model_policy, file_name, intrinsic_on, seed):
 
             episode_reward    = 0
             episode_timesteps = 0
-            episode_num       += 1
+            episode_num      += 1
 
             if episode_num % 10 == 0:
                 print("--------------------------------------------")
                 evaluation_loop(env, model_policy, frames_stack, total_step_counter)
                 print("--------------------------------------------")
 
-
-    # model_policy.save_models(filename=file_name)
-    # plot_reward_curve(historical_reward, filename=file_name)
+    model_policy.save_models(filename=file_name)
+    plot_reward_curve(historical_reward, filename=file_name)
 
 
 
@@ -154,7 +151,7 @@ def evaluation_loop(env, model_policy, frames_stack, total_counter):
 
     fps = 60
     video_name = f'videos/Result_{total_counter+1}.mp4'
-    height, width, layers = frame.shape
+    height, width, channels = frame.shape
     video = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
 
     for total_step_counter in range(int(max_steps_evaluation)):
@@ -181,29 +178,28 @@ def grab_frame(env):
     return frame
 
 def main():
-
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Domain = cartpole, cheetah, reacher
     # task   = balance , run,     easy
 
+    seed        = 1
+    latent_size = 50
+
     domain_name = "cheetah"
     task_name   = "run"
-
-    seed        = 1
     env         = suite.load(domain_name, task_name, task_kwargs={'random': seed})
 
     action_spec = env.action_spec()
     action_size = action_spec.shape[0]
 
-    latent_size  = 50
     model_policy = Algorithm(
         latent_size=latent_size,
         action_num=action_size,
         device=device,
         k=3)
 
-    intrinsic_on = False
+    intrinsic_on = True
     file_name    = domain_name + "_" + task_name + "_" + "TD3_AE_Detach_True" + "_Intrinsic_" + str(intrinsic_on)
 
     train(env, model_policy, file_name, intrinsic_on, seed)
