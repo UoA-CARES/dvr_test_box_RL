@@ -1,3 +1,4 @@
+
 import cv2
 import time
 import random
@@ -8,7 +9,8 @@ import torch
 import numpy as np
 from dm_control import suite
 
-from cares_reinforcement_learning.util import MemoryBuffer
+#from cares_reinforcement_learning.util import MemoryBuffer
+from Custom_Memory import CustomMemoryBuffer
 
 from Algorithm import Algorithm
 from FrameStack_DMCS import FrameStack
@@ -32,7 +34,7 @@ def train(env, model_policy, file_name, intrinsic_on, seed):
 
     batch_size = 128
     seed       = seed
-    G          = 10
+    G          = 1
     k          = 3
     # ------------------------------------#
 
@@ -54,7 +56,9 @@ def train(env, model_policy, file_name, intrinsic_on, seed):
 
     # Needed classes
     # ------------------------------------#
-    memory       = MemoryBuffer()
+    #memory       = MemoryBuffer()
+    memory        = CustomMemoryBuffer()
+
     frames_stack = FrameStack(env, k, seed)
     # ------------------------------------#
 
@@ -74,30 +78,25 @@ def train(env, model_policy, file_name, intrinsic_on, seed):
         if total_step_counter < max_steps_exploration:
             logging.info(f"Running Exploration Steps {total_step_counter}/{max_steps_exploration}")
             action = np.random.uniform(min_action_value, max_action_value, size=action_size)
+
         else:
             action = model_policy.get_action_from_policy(state)  # no normalization needed for action, already between [-1, 1]
-
         next_state, reward_extrinsic, done = frames_stack.step(action)
-
-        if total_step_counter % 200 == 0:
-            #render_flag = True
-            render_flag = False
-        else:
-            render_flag = False
 
         if intrinsic_on:
             # intrinsic rewards
             a = 1
             b = 1
-            surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, next_state, render_flag)
+            surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, next_state)
             reward_surprise = surprise_rate * a
             reward_novelty  = novelty_rate  * b
 
-            # logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
+            logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
             total_reward = reward_extrinsic + reward_surprise + reward_novelty
 
         else:
             total_reward = reward_extrinsic
+
 
         memory.add(state=state, action=action, reward=total_reward, next_state=next_state, done=done)
         state = next_state
@@ -139,7 +138,7 @@ def train(env, model_policy, file_name, intrinsic_on, seed):
 
 
 def evaluation_loop(env, model_policy, frames_stack, total_counter):
-    max_steps_evaluation = 2_000
+    max_steps_evaluation = 1_000
 
     episode_timesteps = 0
     episode_reward    = 0
@@ -199,7 +198,7 @@ def main():
         device=device,
         k=3)
 
-    intrinsic_on = True
+    intrinsic_on = False
     file_name    = domain_name + "_" + task_name + "_" + "TD3_AE_Detach_True" + "_Intrinsic_" + str(intrinsic_on)
 
     train(env, model_policy, file_name, intrinsic_on, seed)
