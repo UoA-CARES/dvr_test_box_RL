@@ -1,6 +1,4 @@
-"""
-Just for testing
-"""
+
 
 import gym
 import torch
@@ -9,13 +7,19 @@ import numpy as np
 import logging
 logging.basicConfig(level=logging.INFO)
 
-from Surprise import Deep_Surprise
 from cares_reinforcement_learning.util import MemoryBuffer
 from cares_reinforcement_learning.util import helpers as hlp
 
+from DBSCAN import DBSCAN
 
 
-def train(env, prediction_model):
+
+def train(env, cluster_model):
+
+    max_steps_training    = 10_000
+    max_steps_exploration = 2_000
+    batch_size            = 32
+    seed                  = 123
 
     max_steps_training    = 10_000
     max_steps_exploration = 2_000
@@ -55,11 +59,10 @@ def train(env, prediction_model):
 
         if total_step_counter >= max_steps_exploration:
             experiences = memory.sample(batch_size)
-            prediction_model.train_transition_model(experiences)
-            #prediction_model.train_transition_model_discrete(experiences)
+            cluster_model.train_model(experiences)
 
         if done or truncated:
-            logging.info(f"Total T:{total_step_counter + 1} Episode {episode_num + 1} was completed with {episode_timesteps} steps taken and a Reward= {episode_reward:.3f}")
+            logging.info(f"Total T:{total_step_counter + 1} Episode {episode_num + 1} was completed with {episode_timesteps} steps")
 
             # Reset environment
             state, _ = env.reset()
@@ -67,7 +70,7 @@ def train(env, prediction_model):
             episode_timesteps = 0
             episode_num += 1
 
-    prediction_model.save_model()
+
 
 
 def main():
@@ -79,14 +82,13 @@ def main():
     obs_size    = env.observation_space.shape[0]
     action_size = env.action_space.shape[0]
 
-    prediction_model = Deep_Surprise(
-        input_dim=obs_size+action_size,
-        output_dim=obs_size,
+    cluster_model = DBSCAN(
+        input_dim=None,
+        output_dim=None,
         device=device,
-        ensemble_size=10
     )
 
-    train(env, prediction_model)
+    train(env, cluster_model)
 
 
 if __name__ == '__main__':

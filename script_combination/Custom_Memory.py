@@ -25,13 +25,11 @@ class CustomMemoryBuffer:
         next_state = experience["next_state"]
         done       = experience["done"]
 
-
         np.copyto(self.states[self.idx], state)
         np.copyto(self.actions[self.idx], action)
         np.copyto(self.rewards[self.idx], reward)
         np.copyto(self.next_states[self.idx], next_state)
         np.copyto(self.dones[self.idx], done)
-
 
         self.idx  = (self.idx + 1) % self.max_capacity
         self.full = self.full or self.idx == 0

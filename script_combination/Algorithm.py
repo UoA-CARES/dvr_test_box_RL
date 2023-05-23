@@ -1,18 +1,15 @@
-import os
 
+import os
 import logging
 logging.basicConfig(level=logging.INFO)
-
-import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 
 import numpy as np
-from cares_reinforcement_learning.util import helpers as hlp
 from skimage.metrics import structural_similarity as ssim
-from PIL import ImageChops
 
 from networks import Actor
 from networks import Critic
@@ -69,7 +66,6 @@ class Algorithm:
         w_decay_epp  = 1e-3
         self.eppm_optimizers = [torch.optim.Adam(self.eppm[i].parameters(), lr=lr_eppm, weight_decay=w_decay_epp) for i in range(self.ensemble_size)]
 
-
     def get_action_from_policy(self, state, evaluation=False, noise_scale=0.1):
         self.actor.eval()
         with torch.no_grad():
@@ -97,7 +93,6 @@ class Algorithm:
             novelty_rate  = self.get_novelty_rate(state_tensor, plot_flag)
 
             return surprise_rate, novelty_rate
-
 
     def get_surprise_rate(self, state_tensor_img, action_tensor, next_state_array_img):
 
