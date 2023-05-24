@@ -1,4 +1,5 @@
 
+import cv2
 import gym
 import time
 import torch
@@ -9,17 +10,29 @@ import numpy as np
 import logging
 logging.basicConfig(level=logging.INFO)
 
-from cares_reinforcement_learning.util import MemoryBuffer
+#from cares_reinforcement_learning.util import MemoryBuffer
+from Custom_Memory import CustomMemoryBuffer
 from cares_reinforcement_learning.util import helpers as hlp
 
 from Algorithm import Algorithm
 from FrameStack_3CH import FrameStack
 
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+def plot_reward_curve(data_reward, filename):
+    data = pd.DataFrame.from_dict(data_reward)
+    data.plot(x='step', y='episode_reward', title="Reward Curve")
+    plt.title(filename)
+    # plt.show()
+    plt.savefig(f"plots/{filename}.png")
+    plt.close()
 
 def train(env, model_policy,  file_name, intrinsic_on, k):
 
     max_steps_training    = 100_000
-    max_steps_exploration = 300_000
+    max_steps_exploration = 1_000
 
     batch_size = 128
     seed       = 1 # 571 seed gives no that great results
@@ -28,6 +41,7 @@ def train(env, model_policy,  file_name, intrinsic_on, k):
 
     min_action_value = env.action_space.low[0]
     max_action_value = env.action_space.high[0]
+    action_size      = env.action_space.shape[0]
 
     #-----------------------------------#
     torch.manual_seed(seed)
@@ -37,7 +51,9 @@ def train(env, model_policy,  file_name, intrinsic_on, k):
     env.action_space.seed(seed)
     # -----------------------------------#
 
-    memory       = MemoryBuffer()
+    # memory = MemoryBuffer()
+    memory = CustomMemoryBuffer(action_size)
+
     frames_stack = FrameStack(env, k, seed)
 
     episode_timesteps = 0
@@ -46,11 +62,10 @@ def train(env, model_policy,  file_name, intrinsic_on, k):
     historical_reward = {"step": [], "episode_reward": []}
 
     start_time = time.time()
-    state = frames_stack.reset()  # for k images
+    state      = frames_stack.reset()  # for k images
 
     for total_step_counter in range(int(max_steps_training)):
         episode_timesteps += 1
-
         if total_step_counter < max_steps_exploration:
             logging.info(f"Running Exploration Steps {total_step_counter}/{max_steps_exploration}")
             action_env = env.action_space.sample()  # action range the env uses [e.g. -2 , 2 for pendulum]
@@ -61,22 +76,17 @@ def train(env, model_policy,  file_name, intrinsic_on, k):
 
         next_state, reward_extrinsic, done, truncated, info = frames_stack.step(action_env)
 
-        if total_step_counter % 200 == 0:
-            #render_flag = True
-            render_flag = False
-        else:
-            render_flag = False
-
         if intrinsic_on:
-            # intrinsic rewards
-            a = 1
-            b = 1
-            surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, next_state, render_flag)
-            reward_surprise = surprise_rate * a
-            reward_novelty  = novelty_rate  * b
-
-            # logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
-            total_reward = reward_extrinsic + reward_surprise + reward_novelty
+            if total_step_counter > max_steps_exploration:
+                a = 1
+                b = 1
+                surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, next_state)
+                reward_surprise = surprise_rate * a
+                reward_novelty  = novelty_rate  * b
+                logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
+                total_reward = reward_extrinsic + reward_surprise + reward_novelty
+            else:
+                total_reward = reward_extrinsic
 
         else:
             total_reward = reward_extrinsic
@@ -89,8 +99,8 @@ def train(env, model_policy,  file_name, intrinsic_on, k):
         if total_step_counter >= max_steps_exploration:
             num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
             for _ in range(num_updates):
-                experiences = memory.sample(batch_size)
-                model_policy.train_policy(experiences)
+                experience = memory.sample(batch_size)
+                model_policy.train_policy(experience)
 
             if intrinsic_on:
                 experiences = memory.sample(batch_size)
@@ -110,8 +120,56 @@ def train(env, model_policy,  file_name, intrinsic_on, k):
             episode_timesteps = 0
             episode_num       += 1
 
+            if episode_num % 10 == 0:
+                plot_reward_curve(historical_reward, filename=file_name)
+                print("--------------------------------------------")
+                evaluation_loop(env, model_policy, frames_stack, total_step_counter, max_action_value, min_action_value)
+                print("--------------------------------------------")
+
     model_policy.save_models(filename=file_name)
     hlp.plot_reward_curve(historical_reward)
+
+
+def evaluation_loop(env, model_policy, frames_stack, total_counter, max_action_value, min_action_value):
+    max_steps_evaluation = 1_000
+
+    episode_timesteps = 0
+    episode_reward    = 0
+    episode_num       = 0
+
+    state = frames_stack.reset()
+    frame = grab_frame(env)
+
+    fps = 60
+    video_name = f'videos/Result_Gym_{total_counter+1}.mp4'
+    height, width, channels = frame.shape
+    video = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
+
+    for total_step_counter in range(int(max_steps_evaluation)):
+        episode_timesteps += 1
+
+        action     = model_policy.get_action_from_policy(state, evaluation=True)
+        action_env = hlp.denormalize(action, max_action_value, min_action_value)
+
+        state, reward_extrinsic, done, truncated, info = frames_stack.step(action_env)
+
+        episode_reward += reward_extrinsic
+        video.write(grab_frame(env))
+
+        if done or truncated:
+            logging.info(f" EVALUATION | Eval Episode {episode_num + 1} was completed with {episode_timesteps} steps | Reward= {episode_reward:.3f}")
+            state = frames_stack.reset()
+            episode_reward    = 0
+            episode_timesteps = 0
+            episode_num       += 1
+
+    video.release()
+
+
+def grab_frame(env):
+    frame = env.render()
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # Convert to BGR for use with OpenCV
+    return frame
 
 
 def main():
@@ -131,7 +189,7 @@ def main():
         color=True)
 
     intrinsic_on = False
-    file_name    = env_gym_name  + "_" + "TD3_AE_Detach_False" + "_Intrinsic_" + str(intrinsic_on)
+    file_name    = env_gym_name  + "_" + "TD3_AE_Detach_True" + "_Intrinsic_" + str(intrinsic_on)
 
     train(env, model_policy, file_name, intrinsic_on, number_stack_frames)
 

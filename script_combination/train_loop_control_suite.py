@@ -58,7 +58,7 @@ def train(env, model_policy, file_name, intrinsic_on, seed):
     # Needed classes
     # ------------------------------------#
     #memory       = MemoryBuffer()
-    memory        = CustomMemoryBuffer()
+    memory        = CustomMemoryBuffer(action_size)
 
     frames_stack = FrameStack(env, k, seed)
     # ------------------------------------#

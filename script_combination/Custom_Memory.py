@@ -2,11 +2,11 @@
 import numpy as np
 
 class CustomMemoryBuffer:
-    def __init__(self, max_capacity=int(1e6)):
+    def __init__(self, action_size, max_capacity=int(1e6), ):
         self.max_capacity = max_capacity
 
         obs_shape    = (9, 84, 84)
-        action_shape = 6
+        action_shape = action_size
 
         self.states      = np.empty((max_capacity, *obs_shape), dtype=np.uint8)
         self.next_states = np.empty((max_capacity, *obs_shape), dtype=np.uint8)
