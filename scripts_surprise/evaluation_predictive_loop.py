@@ -24,11 +24,19 @@ def evaluation(env, prediction_ensemble_model):
     avr_mean, avr_std, avr_std_total = prediction_ensemble_model.get_prediction_from_model(state, action)
     #prediction_ensemble_model.get_prediction_from_model_discrete(state, action)
 
-    print("Uncertainly in each element of prediction", avr_std)
-    print("Average Uncertainly in prediction", avr_std_total)
+
+
+
+
 
     print("Predicted State", avr_mean)
     print("Next State True", next_state)
+
+    print("Error in the prediction", (avr_mean - next_state))
+    print("Uncertainly in each element of prediction", avr_std)
+
+    print("Average Uncertainly in prediction", avr_std_total)
+    print("Average Error in prediction", np.mean(avr_mean - next_state))
 
 
 

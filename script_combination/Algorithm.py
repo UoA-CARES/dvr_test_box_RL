@@ -81,9 +81,18 @@ class Algorithm:
         self.actor.train()
         return action
 
+    def get_representation(self, state):
+        with torch.no_grad():
+            state_tensor = torch.FloatTensor(state).to(self.device)
+            state_tensor = state_tensor.unsqueeze(0)
+            z_vector     = self.encoder(state_tensor)
+            return z_vector.cpu().numpy()
+
+
     def get_intrinsic_values(self, state, action, next_state, plot_flag=False):
 
         with torch.no_grad():
+
             state_tensor  = torch.FloatTensor(state).to(self.device)
             state_tensor  = state_tensor.unsqueeze(0)
             action_tensor = torch.FloatTensor(action).to(self.device)
@@ -93,6 +102,9 @@ class Algorithm:
             novelty_rate  = self.get_novelty_rate(state_tensor, plot_flag)
 
             return surprise_rate, novelty_rate
+
+    def comparison_function(self, z_vector):
+        pass
 
     def get_surprise_rate(self, state_tensor_img, action_tensor, next_state_array_img):
 
@@ -116,16 +128,16 @@ class Algorithm:
 
             avr_uncertainty = np.mean(uncertainty_prediction) # avr uncertainty in the prediction
 
-            z_next_latent_prediction_tensor = torch.FloatTensor(z_next_latent_prediction).to(self.device)
+            # z_next_latent_prediction_tensor = torch.FloatTensor(z_next_latent_prediction).to(self.device)
+            #
+            # next_state_rec_img       = self.decoder(z_next_latent_prediction_tensor)
+            # reconstr_stack_next_img  = next_state_rec_img.cpu().numpy()[0]  # --> (k , 84 ,84)
+            #
+            # target_images    = next_state_array_img / 255
+            # ssim_index_total = ssim(target_images, reconstr_stack_next_img, full=False, data_range=1, channel_axis=0)
+            # surprise_rate    = (1 - ssim_index_total) #+ avr_uncertainty
 
-            next_state_rec_img       = self.decoder(z_next_latent_prediction_tensor)
-            reconstr_stack_next_img  = next_state_rec_img.cpu().numpy()[0]  # --> (k , 84 ,84)
-
-            target_images    = next_state_array_img / 255
-            ssim_index_total = ssim(target_images, reconstr_stack_next_img, full=False, data_range=1, channel_axis=0)
-            surprise_rate    = (1 - ssim_index_total) + avr_uncertainty
-
-            return surprise_rate
+            return avr_uncertainty
 
     def get_novelty_rate(self, state_tensor_img, flag):
 

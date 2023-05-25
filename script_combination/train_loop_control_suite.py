@@ -98,6 +98,16 @@ def train(env, model_policy, file_name, intrinsic_on, seed):
         else:
             total_reward = reward_extrinsic
 
+        # --------------------------------------------------------------
+        # if total_step_counter >= max_steps_exploration:
+        #     z_state = model_policy.get_representation(state)
+        #     new     = memory.search_state(z_state)
+        #     if new is not True:
+        #         novelty_reward = 1
+        #         memory.add_vector(z_state)
+        #     else:
+        #         novelty_reward = 0
+        # --------------------------------------------------------------
         memory.add(state=state, action=action, reward=total_reward, next_state=next_state, done=done)
         state = next_state
 
@@ -181,15 +191,17 @@ def grab_frame(env):
 def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # Domain = cartpole, cheetah, reacher
+    # Domain = cartpole, cheetah, reacher, ball_in_cup
     # task   = balance , run,     easy
 
     seed        = 1
     latent_size = 50
 
-    domain_name = "cheetah"
-    task_name   = "run"
+    domain_name = "ball_in_cup"
+    task_name   = "catch"
+
     env         = suite.load(domain_name, task_name, task_kwargs={'random': seed})
+
 
     action_spec = env.action_spec()
     action_size = action_spec.shape[0]

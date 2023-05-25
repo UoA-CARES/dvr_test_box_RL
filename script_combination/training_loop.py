@@ -81,13 +81,15 @@ def train(env, model_policy,  file_name, intrinsic_on, k):
                 a = 1
                 b = 1
                 surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, next_state)
+
                 reward_surprise = surprise_rate * a
                 reward_novelty  = novelty_rate  * b
                 logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
+
                 total_reward = reward_extrinsic + reward_surprise + reward_novelty
+
             else:
                 total_reward = reward_extrinsic
-
         else:
             total_reward = reward_extrinsic
 
@@ -188,8 +190,8 @@ def main():
         k=number_stack_frames,
         color=True)
 
-    intrinsic_on = False
-    file_name    = env_gym_name  + "_" + "TD3_AE_Detach_True" + "_Intrinsic_" + str(intrinsic_on)
+    intrinsic_on = True
+    file_name    = env_gym_name  + "_" + "TD3_AE_Surprise_Novelty" + "_Intrinsic_" + str(intrinsic_on)
 
     train(env, model_policy, file_name, intrinsic_on, number_stack_frames)
 

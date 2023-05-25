@@ -7,12 +7,16 @@ class CustomMemoryBuffer:
 
         obs_shape    = (9, 84, 84)
         action_shape = action_size
+        latent_size  = 50
 
         self.states      = np.empty((max_capacity, *obs_shape), dtype=np.uint8)
         self.next_states = np.empty((max_capacity, *obs_shape), dtype=np.uint8)
         self.actions     = np.empty((max_capacity, action_shape), dtype=np.float32)
         self.rewards     = np.empty((max_capacity, 1), dtype=np.float32)
         self.dones       = np.empty((max_capacity, 1), dtype=np.float32)
+
+        self.z_vector = np.empty((max_capacity, latent_size), dtype=np.float32)
+        self.idx_z    = 0
 
         self.idx  = 0
         self.full = False
@@ -45,3 +49,13 @@ class CustomMemoryBuffer:
         dones       = self.dones[idxs]
 
         return states, actions, rewards, next_states, dones
+
+    def add_vector(self, z_vector):
+        np.copyto(self.z_vector[self.idx], z_vector)
+        self.idx_z = (self.idx_z + 1) % self.max_capacity
+
+    def search_state(self, z_arrive):
+        new = z_arrive in self.z_vector
+        print(new, "========")
+        return new
+

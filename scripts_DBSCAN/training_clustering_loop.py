@@ -1,5 +1,4 @@
 
-
 import gym
 import torch
 import numpy as np
@@ -13,18 +12,12 @@ from cares_reinforcement_learning.util import helpers as hlp
 from DBSCAN import DBSCAN
 
 
-
 def train(env, cluster_model):
 
     max_steps_training    = 10_000
-    max_steps_exploration = 2_000
-    batch_size            = 32
-    seed                  = 123
-
-    max_steps_training    = 10_000
-    max_steps_exploration = 2_000
-    batch_size = 32
-    seed = 123
+    max_steps_exploration = 1_000
+    batch_size            = 128
+    seed                  = 1
 
     min_action_value = env.action_space.low[0]
     max_action_value = env.action_space.high[0]
@@ -54,12 +47,18 @@ def train(env, cluster_model):
             action = hlp.normalize(action_env, max_action_value, min_action_value)  # REMOVE THIS line to the actual agent/policy
 
         next_state, reward, done, truncated, info = env.step(action_env)
+
+        # detect here if a state is part of the cluster or not using the current state in the whole memory buffer
+        if total_step_counter >= max_steps_exploration:
+            novel_state_index = cluster_model.evaluate_state(state)
+
+
         memory.add(state=state, action=action, reward=reward, next_state=next_state, done=done)
         state = next_state
 
         if total_step_counter >= max_steps_exploration:
             experiences = memory.sample(batch_size)
-            cluster_model.train_model(experiences)
+            #cluster_model.train_model(experiences)
 
         if done or truncated:
             logging.info(f"Total T:{total_step_counter + 1} Episode {episode_num + 1} was completed with {episode_timesteps} steps")
@@ -69,7 +68,6 @@ def train(env, cluster_model):
             episode_reward    = 0
             episode_timesteps = 0
             episode_num += 1
-
 
 
 
