@@ -86,7 +86,7 @@ class Algorithm:
             state_tensor = torch.FloatTensor(state).to(self.device)
             state_tensor = state_tensor.unsqueeze(0)
             z_vector     = self.encoder(state_tensor)
-            return z_vector.cpu().numpy()
+            return z_vector.cpu().numpy().flatten()
 
 
     def get_intrinsic_values(self, state, action, next_state, plot_flag=False):
