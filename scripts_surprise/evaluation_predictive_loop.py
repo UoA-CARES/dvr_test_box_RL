@@ -21,22 +21,23 @@ def evaluation(env, prediction_ensemble_model):
 
     next_state, reward, done, truncated, info = env.step(action_env)
 
-    avr_mean, avr_std, avr_std_total = prediction_ensemble_model.get_prediction_from_model(state, action)
-    #prediction_ensemble_model.get_prediction_from_model_discrete(state, action)
+    # avr_mean, avr_std, avr_std_total = prediction_ensemble_model.get_prediction_from_model(state, action)
+    # print("Predicted State", avr_mean)
+    # print("Next State True", next_state)
+    # print("Error in the prediction", (avr_mean - next_state))
+    # print("Uncertainly in each element of prediction", avr_std)
+    # print("Average Uncertainly in prediction", avr_std_total)
+    # print("Average Error in prediction", np.mean(avr_mean - next_state))
 
 
-
-
-
-
-    print("Predicted State", avr_mean)
+    prediction_avr = prediction_ensemble_model.get_prediction_from_model_discrete(state, action)
+    print("Predicted State", prediction_avr)
     print("Next State True", next_state)
+    print("Error in the prediction", (prediction_avr - next_state))
+    print("Average Error in prediction", np.mean(prediction_avr - next_state))
+    mse = (np.square(prediction_avr - next_state)).mean()
+    print("MSE Error in prediction", mse)
 
-    print("Error in the prediction", (avr_mean - next_state))
-    print("Uncertainly in each element of prediction", avr_std)
-
-    print("Average Uncertainly in prediction", avr_std_total)
-    print("Average Error in prediction", np.mean(avr_mean - next_state))
 
 
 
@@ -53,7 +54,7 @@ def main():
         input_dim=obs_size+action_size,
         output_dim=obs_size,
         device=device,
-        ensemble_size=10
+        ensemble_size=5
     )
 
     evaluation(env, prediction_model)

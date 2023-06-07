@@ -13,7 +13,6 @@ class EPPM(nn.Module):
     def __init__(self, latent_size, num_actions):
         super(EPPM, self).__init__()
 
-
         self.input_dim   = latent_size + num_actions
         self.output_dim  = latent_size
         self.hidden_size = [512, 512]

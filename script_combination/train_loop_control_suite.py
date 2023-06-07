@@ -8,6 +8,7 @@ import torch
 import numpy as np
 from dm_control import suite
 
+from datetime import datetime
 #from cares_reinforcement_learning.util import MemoryBuffer
 from Custom_Memory import CustomMemoryBuffer
 
@@ -82,26 +83,17 @@ def train(env, model_policy, file_name, intrinsic_on, seed):
             action = np.random.uniform(min_action_value, max_action_value, size=action_size)
         else:
             action = model_policy.get_action_from_policy(state)  # no normalization needed for action, already between [-1, 1]
-        next_state, reward_extrinsic, done = frames_stack.step(action)
 
-        # -------------------------------------------------#
-        z_vector_state = model_policy.get_representation(state)
-        # -------------------------------------------------#
+        next_state, reward_extrinsic, done = frames_stack.step(action)
 
         if intrinsic_on:
             if total_step_counter > max_steps_exploration:
-                a = 1
-                b = 1
-
-                new_search = memory.search_state(z_vector_state)
-                if new_search is True:
-                    novelty_reward = 1
-                else:
-                    novelty_reward = 0
+                a = 0.5
+                b = 0.5
 
                 surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, next_state)
                 reward_surprise = surprise_rate * a
-                reward_novelty  = novelty_rate  * b + novelty_reward
+                reward_novelty  = novelty_rate  * b
 
                 logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
                 total_reward = reward_extrinsic + reward_surprise + reward_novelty
@@ -110,44 +102,44 @@ def train(env, model_policy, file_name, intrinsic_on, seed):
         else:
             total_reward = reward_extrinsic
 
-
-        memory.add(state=state, action=action, reward=total_reward, next_state=next_state, done=done, latent_z=z_vector_state)
-        state = next_state
-
-        episode_reward += reward_extrinsic  # just for plotting purposes use this reward as it is
-
-        if total_step_counter >= max_steps_exploration:
-            num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
-            for _ in range(num_updates):
-                experience = memory.sample(batch_size)
-                model_policy.train_policy(experience)
-
-            if intrinsic_on:
-                experiences = memory.sample(batch_size)
-                model_policy.train_predictive_model(experiences)
-
-        if done:
-            episode_duration = time.time() - start_time
-            start_time       = time.time()
-            logging.info(f"Total T:{total_step_counter + 1} | Episode {episode_num + 1} was completed with {episode_timesteps} steps | Reward= {episode_reward:.3f} | Duration= {episode_duration:.2f} Seg")
-
-            historical_reward["step"].append(total_step_counter)
-            historical_reward["episode_reward"].append(episode_reward)
-
-            state = frames_stack.reset()
-
-            episode_reward    = 0
-            episode_timesteps = 0
-            episode_num      += 1
-
-            if episode_num % 10 == 0:
-                plot_reward_curve(historical_reward, filename=file_name)
-                print("--------------------------------------------")
-                evaluation_loop(env, model_policy, frames_stack, total_step_counter)
-                print("--------------------------------------------")
-
-    model_policy.save_models(filename=file_name)
-    plot_reward_curve(historical_reward, filename=file_name)
+    #
+    #     memory.add(state=state, action=action, reward=total_reward, next_state=next_state, done=done)
+    #     state = next_state
+    #
+    #     episode_reward += reward_extrinsic  # just for plotting purposes use this reward as it is
+    #
+    #     if total_step_counter >= max_steps_exploration:
+    #         num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
+    #         for _ in range(num_updates):
+    #             experience = memory.sample(batch_size)
+    #             model_policy.train_policy(experience)
+    #
+    #         if intrinsic_on:
+    #             experiences = memory.sample(batch_size)
+    #             model_policy.train_predictive_model(experiences)
+    #
+    #     if done:
+    #         episode_duration = time.time() - start_time
+    #         start_time       = time.time()
+    #         logging.info(f"Total T:{total_step_counter + 1} | Episode {episode_num + 1} was completed with {episode_timesteps} steps | Reward= {episode_reward:.3f} | Duration= {episode_duration:.2f} Seg")
+    #
+    #         historical_reward["step"].append(total_step_counter)
+    #         historical_reward["episode_reward"].append(episode_reward)
+    #
+    #         state = frames_stack.reset()
+    #
+    #         episode_reward    = 0
+    #         episode_timesteps = 0
+    #         episode_num      += 1
+    #
+    #         if episode_num % 10 == 0:
+    #             plot_reward_curve(historical_reward, filename=file_name)
+    #             print("--------------------------------------------")
+    #             evaluation_loop(env, model_policy, frames_stack, total_step_counter)
+    #             print("--------------------------------------------")
+    #
+    # model_policy.save_models(filename=file_name)
+    # plot_reward_curve(historical_reward, filename=file_name)
 
 
 
@@ -192,16 +184,17 @@ def grab_frame(env):
 
 
 def main():
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Domain = cartpole, cheetah, reacher, ball_in_cup
-    # task   = balance , run,     easy
+    # task   = balance , run,     easy,    catch
 
     seed        = 1
     latent_size = 50
 
-    domain_name = "cheetah"
-    task_name   = "run"
+    domain_name = "ball_in_cup"
+    task_name   = "catch"
 
     env         = suite.load(domain_name, task_name, task_kwargs={'random': seed})
 
@@ -214,8 +207,9 @@ def main():
         device=device,
         k=3)
 
-    intrinsic_on = True
-    file_name    = domain_name + "new_" + task_name + "_" + "TD3_AE_Detach_True" + "_Intrinsic_" + str(intrinsic_on)
+    date_time_str = datetime.now().strftime("%m_%d_%H_%M")
+    intrinsic_on  = True
+    file_name     = domain_name + "_" + str(date_time_str) + "_" + task_name + "_" + "TD3_AE_Detach_True" + "_Intrinsic_" + str(intrinsic_on)
 
     train(env, model_policy, file_name, intrinsic_on, seed)
 

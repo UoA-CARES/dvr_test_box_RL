@@ -19,8 +19,8 @@ class Deep_Surprise:
 
         self.ensemble_network = nn.ModuleList()  # ModuleList have not a forward method
 
-        networks = [Transition_Network(self.input_dim, self.output_dim) for _ in range(self.ensemble_size)]
-        #networks = [Transition_Network_Discrete(self.input_dim, self.output_dim) for _ in range(self.ensemble_size)]
+        #networks = [Transition_Network(self.input_dim, self.output_dim) for _ in range(self.ensemble_size)]
+        networks = [Transition_Network_Discrete(self.input_dim, self.output_dim) for _ in range(self.ensemble_size)]
 
         self.ensemble_network.extend(networks)
         self.ensemble_network.to(self.device)
@@ -91,7 +91,7 @@ class Deep_Surprise:
         ensemble_vector = np.concatenate(predict_vector_set, axis=0)
         avr_vector      = np.mean(ensemble_vector, axis=0)
 
-        print("Prediction", avr_vector)
+        return avr_vector
 
 
     def get_prediction_from_model(self, state, action):
