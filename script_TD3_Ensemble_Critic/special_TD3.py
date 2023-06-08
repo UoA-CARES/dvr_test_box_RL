@@ -47,7 +47,7 @@ class Special_Agent:
         lr_actor   = 1e-4
         lr_critic  = 1e-3
         self.actor_optimizer  = torch.optim.Adam(self.actor.parameters(), lr=lr_actor)
-        self.critic_optimizer = [torch.optim.Adam(self.ensemble_critic_network_targets[i].parameters(), lr=lr_critic) for i in range(self.ensemble_size)]
+        self.critic_optimizer = [torch.optim.Adam(self.ensemble_critic_network[i].parameters(), lr=lr_critic) for i in range(self.ensemble_size)]
 
 
     def get_action_from_policy(self, state, evaluation=False, noise_scale=0.1):
@@ -66,7 +66,6 @@ class Special_Agent:
         return action
 
     def train_policy(self, experiences):
-
         self.learn_counter += 1
 
         states, actions, rewards, next_states, dones = experiences
@@ -96,10 +95,9 @@ class Special_Agent:
                 target_q_values_ens.append(t_q_value)
             ens = torch.concat(target_q_values_ens, 1)
             target_q_values, _ = torch.min(ens, dim=1)
+
             target_q_values    = target_q_values.reshape(batch_size, 1)
             q_target           = rewards + self.gamma * (1 - dones) * target_q_values
-
-
 
         for critic_net, optimizer_net in zip(self.ensemble_critic_network, self.critic_optimizer):
             q_value     = critic_net(states, actions)
@@ -108,7 +106,6 @@ class Special_Agent:
             optimizer_net.zero_grad()
             critic_loss.backward()
             optimizer_net.step()
-
 
         # Update Actor
         if self.learn_counter % self.policy_update_freq == 0:
@@ -126,13 +123,10 @@ class Special_Agent:
             actor_loss.backward()
             self.actor_optimizer.step()
 
+            # Update target network params
+            for critic_net, target_net in zip(self.ensemble_critic_network, self.ensemble_critic_network_targets):
+                for target_param, param in zip(target_net.Q1.parameters(), critic_net.Q1.parameters()):
+                    target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
 
-        #     # Update target network params
-        #     for target_param, param in zip(self.critic_target.Q1.parameters(), self.critic.Q1.parameters()):
-        #         target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
-        #
-        #     for target_param, param in zip(self.critic_target.Q2.parameters(), self.critic.Q2.parameters()):
-        #         target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
-        #
-        #     for target_param, param in zip(self.actor_target.act_net.parameters(), self.actor.act_net.parameters()):
-        #         target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))
+            for target_param, param in zip(self.actor_target.act_net.parameters(), self.actor.act_net.parameters()):
+                target_param.data.copy_(param.data * self.tau + target_param.data * (1.0 - self.tau))

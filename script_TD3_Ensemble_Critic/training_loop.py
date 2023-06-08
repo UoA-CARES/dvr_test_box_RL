@@ -7,7 +7,6 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 from special_TD3 import Special_Agent
-
 from cares_reinforcement_learning.util import MemoryBuffer
 from cares_reinforcement_learning.util import helpers as hlp
 
@@ -17,7 +16,7 @@ def train(env, special_agent):
     max_steps_training    = 100_000
     max_steps_exploration = 1_000
 
-    batch_size = 4
+    batch_size = 128
     seed       = 1  # 571 seed gives no that great results
     G          = 1
 
@@ -55,8 +54,8 @@ def train(env, special_agent):
         next_state, reward_extrinsic, done, truncated, info = env.step(action_env)
 
         memory.add(state=state, action=action, reward=reward_extrinsic, next_state=next_state, done=done)
-        state = next_state
 
+        state = next_state
         episode_reward += reward_extrinsic
 
         if total_step_counter >= max_steps_exploration:
@@ -95,6 +94,7 @@ def main():
         action_num=action_size,
         device=device,
     )
+
 
     train(env, special_agent)
 

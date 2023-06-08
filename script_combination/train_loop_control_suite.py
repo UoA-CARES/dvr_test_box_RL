@@ -208,7 +208,7 @@ def main():
         k=3)
 
     date_time_str = datetime.now().strftime("%m_%d_%H_%M")
-    intrinsic_on  = True
+    intrinsic_on  = False
     file_name     = domain_name + "_" + str(date_time_str) + "_" + task_name + "_" + "TD3_AE_Detach_True" + "_Intrinsic_" + str(intrinsic_on)
 
     train(env, model_policy, file_name, intrinsic_on, seed)
