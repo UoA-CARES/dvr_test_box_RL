@@ -88,8 +88,8 @@ def train(env, model_policy, file_name, intrinsic_on, seed):
 
         if intrinsic_on:
             if total_step_counter > max_steps_exploration:
-                a = 0.5
-                b = 0.5
+                a = 1.0
+                b = 1.0
 
                 surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, next_state)
                 reward_surprise = surprise_rate * a
@@ -102,44 +102,44 @@ def train(env, model_policy, file_name, intrinsic_on, seed):
         else:
             total_reward = reward_extrinsic
 
-    #
-    #     memory.add(state=state, action=action, reward=total_reward, next_state=next_state, done=done)
-    #     state = next_state
-    #
-    #     episode_reward += reward_extrinsic  # just for plotting purposes use this reward as it is
-    #
-    #     if total_step_counter >= max_steps_exploration:
-    #         num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
-    #         for _ in range(num_updates):
-    #             experience = memory.sample(batch_size)
-    #             model_policy.train_policy(experience)
-    #
-    #         if intrinsic_on:
-    #             experiences = memory.sample(batch_size)
-    #             model_policy.train_predictive_model(experiences)
-    #
-    #     if done:
-    #         episode_duration = time.time() - start_time
-    #         start_time       = time.time()
-    #         logging.info(f"Total T:{total_step_counter + 1} | Episode {episode_num + 1} was completed with {episode_timesteps} steps | Reward= {episode_reward:.3f} | Duration= {episode_duration:.2f} Seg")
-    #
-    #         historical_reward["step"].append(total_step_counter)
-    #         historical_reward["episode_reward"].append(episode_reward)
-    #
-    #         state = frames_stack.reset()
-    #
-    #         episode_reward    = 0
-    #         episode_timesteps = 0
-    #         episode_num      += 1
-    #
-    #         if episode_num % 10 == 0:
-    #             plot_reward_curve(historical_reward, filename=file_name)
-    #             print("--------------------------------------------")
-    #             evaluation_loop(env, model_policy, frames_stack, total_step_counter)
-    #             print("--------------------------------------------")
-    #
-    # model_policy.save_models(filename=file_name)
-    # plot_reward_curve(historical_reward, filename=file_name)
+
+        memory.add(state=state, action=action, reward=total_reward, next_state=next_state, done=done)
+        state = next_state
+
+        episode_reward += reward_extrinsic  # just for plotting purposes use this reward as it is
+
+        if total_step_counter >= max_steps_exploration:
+            num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
+            for _ in range(num_updates):
+                experience = memory.sample(batch_size)
+                model_policy.train_policy(experience)
+
+            if intrinsic_on:
+                experiences = memory.sample(batch_size)
+                model_policy.train_predictive_model(experiences)
+
+        if done:
+            episode_duration = time.time() - start_time
+            start_time       = time.time()
+            logging.info(f"Total T:{total_step_counter + 1} | Episode {episode_num + 1} was completed with {episode_timesteps} steps | Reward= {episode_reward:.3f} | Duration= {episode_duration:.2f} Seg")
+
+            historical_reward["step"].append(total_step_counter)
+            historical_reward["episode_reward"].append(episode_reward)
+
+            state = frames_stack.reset()
+
+            episode_reward    = 0
+            episode_timesteps = 0
+            episode_num      += 1
+
+            if episode_num % 10 == 0:
+                plot_reward_curve(historical_reward, filename=file_name)
+                print("--------------------------------------------")
+                evaluation_loop(env, model_policy, frames_stack, total_step_counter)
+                print("--------------------------------------------")
+
+    model_policy.save_models(filename=file_name)
+    plot_reward_curve(historical_reward, filename=file_name)
 
 
 

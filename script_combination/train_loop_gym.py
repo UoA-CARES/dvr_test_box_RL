@@ -36,7 +36,7 @@ def train(env, model_policy,  file_name, intrinsic_on, k):
 
     batch_size = 128
     seed       = 1 # 571 seed gives no that great results
-    G          = 10
+    G          = 1
     k          = k
 
     min_action_value = env.action_space.low[0]
@@ -84,7 +84,7 @@ def train(env, model_policy,  file_name, intrinsic_on, k):
 
                 reward_surprise = surprise_rate * a
                 reward_novelty  = novelty_rate  * b
-                logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
+                #logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
 
                 total_reward = reward_extrinsic + reward_surprise + reward_novelty
 
@@ -187,10 +187,9 @@ def main():
         latent_size=latent_size,
         action_num=action_size,
         device=device,
-        k=number_stack_frames,
-        color=True)
+        k=number_stack_frames)
 
-    intrinsic_on = True
+    intrinsic_on = False
     file_name    = env_gym_name  + "_" + "TD3_AE_Surprise_Novelty" + "_Intrinsic_" + str(intrinsic_on)
 
     train(env, model_policy, file_name, intrinsic_on, number_stack_frames)

@@ -151,7 +151,7 @@ class Algorithm:
 
                 ensemble_vector = np.concatenate(predict_vector_set, axis=0)
 
-                z_next_latent_prediction = np.mean(ensemble_vector, axis=0) # prediction vector average among the ensembles
+                z_next_latent_prediction = np.mean(ensemble_vector, axis=0) # prediction vector average among the ensembles models
                 z_next_latent_true       = latent_next_state.detach().cpu().numpy()[0]
                 mse = (np.square(z_next_latent_prediction - z_next_latent_true)).mean()
                 return mse
@@ -277,7 +277,7 @@ class Algorithm:
         z_vector = self.encoder(states)
         rec_obs  = self.decoder(z_vector)
 
-        target_images = states / 255 # this because the images 0- 255 and the prediction is [0-1], I did not normalized before to save experiences as Unit8
+        target_images = states / 255 # this because the image is [0-255] and the prediction is [0-1], I did not normalized before to save experiences as Unit8
         rec_loss      = F.mse_loss(target_images, rec_obs)
 
         latent_loss = (0.5 * z_vector.pow(2).sum(1)).mean()  # add L2 penalty on latent representation
@@ -292,8 +292,8 @@ class Algorithm:
         # Update Actor
         if self.learn_counter % self.policy_update_freq == 0:
             actor_q_one, actor_q_two = self.critic(states, self.actor(states, detach_encoder=True),  detach_encoder=True)
-            actor_q_values = torch.minimum(actor_q_one, actor_q_two)
-            actor_loss = -actor_q_values.mean()
+            actor_q_values           = torch.minimum(actor_q_one, actor_q_two)
+            actor_loss               = -actor_q_values.mean()
 
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
@@ -335,10 +335,6 @@ class Algorithm:
                 loss_neg_log_likelihood.backward()
                 optimizer.step()
         else:
-
-            #work here for shape
-
-
             for predictive_network, optimizer in zip(self.epm, self.epm_optimizers):
                 predictive_network.train()
                 # Get the deterministic prediction of each model
@@ -349,7 +345,6 @@ class Algorithm:
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-
 
     def save_models(self, filename):
         dir_exists = os.path.exists("models")

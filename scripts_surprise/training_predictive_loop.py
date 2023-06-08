@@ -1,5 +1,4 @@
 """
-Just for testing
 """
 
 import gym
