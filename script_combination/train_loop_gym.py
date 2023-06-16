@@ -5,6 +5,8 @@ import time
 import torch
 import random
 
+from datetime import datetime
+
 import numpy as np
 
 import logging
@@ -19,6 +21,13 @@ from FrameStack_3CH import FrameStack
 
 import pandas as pd
 import matplotlib.pyplot as plt
+
+
+from networks import Actor
+from networks import Critic
+from networks import Encoder
+from networks import Decoder
+
 
 
 def plot_reward_curve(data_reward, filename):
@@ -103,10 +112,9 @@ def train(env, model_policy,  file_name, intrinsic_on, k):
             for _ in range(num_updates):
                 experience = memory.sample(batch_size)
                 model_policy.train_policy(experience)
-
-            if intrinsic_on:
-                experiences = memory.sample(batch_size)
-                model_policy.train_predictive_model(experiences)
+                if intrinsic_on:
+                    # experiences = memory.sample(batch_size)
+                    model_policy.train_predictive_model(experience)
 
         if done or truncated:
             episode_duration = time.time() - start_time
@@ -182,15 +190,34 @@ def main():
     action_size  = env.action_space.shape[0]
     latent_size  = 50
     number_stack_frames = 3
+    k = number_stack_frames * 3
+
+    encoder = Encoder(latent_dim=latent_size, k=k)
+    decoder = Decoder(latent_dim=latent_size, k=k)
+
+    actor  = Actor(latent_size, action_size, encoder)
+    critic = Critic(latent_size, action_size, encoder)
 
     model_policy = Algorithm(
-        latent_size=latent_size,
-        action_num=action_size,
-        device=device,
-        k=number_stack_frames)
+        encoder,
+        decoder,
+        actor,
+        critic,
+        action_size,
+        latent_size,
+        device
+    )
 
-    intrinsic_on = False
-    file_name    = env_gym_name  + "_" + "TD3_AE_Surprise_Novelty" + "_Intrinsic_" + str(intrinsic_on)
+    # model_policy = Algorithm(
+    #     latent_size=latent_size,
+    #     action_num=action_size,
+    #     device=device,
+    #     k=number_stack_frames)
+    #
+
+    intrinsic_on  = False
+    date_time_str = datetime.now().strftime("%m_%d_%H_%M")
+    file_name     = env_gym_name  + "_" + str(date_time_str) + "_" + "TD3_AE_Surprise_Novelty" + "_Intrinsic_" + str(intrinsic_on)
 
     train(env, model_policy, file_name, intrinsic_on, number_stack_frames)
 

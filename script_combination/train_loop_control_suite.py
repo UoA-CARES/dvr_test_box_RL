@@ -95,7 +95,7 @@ def train(env, model_policy, file_name, intrinsic_on, seed):
                 reward_surprise = surprise_rate * a
                 reward_novelty  = novelty_rate  * b
 
-                logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
+                #logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
                 total_reward = reward_extrinsic + reward_surprise + reward_novelty
             else:
                 total_reward = reward_extrinsic
@@ -113,10 +113,11 @@ def train(env, model_policy, file_name, intrinsic_on, seed):
             for _ in range(num_updates):
                 experience = memory.sample(batch_size)
                 model_policy.train_policy(experience)
-
-            if intrinsic_on:
-                experiences = memory.sample(batch_size)
-                model_policy.train_predictive_model(experiences)
+                if intrinsic_on:
+                    model_policy.train_predictive_model(experience)
+            # if intrinsic_on:
+            #     experiences = memory.sample(batch_size)
+            #     model_policy.train_predictive_model(experiences)
 
         if done:
             episode_duration = time.time() - start_time
@@ -207,8 +208,8 @@ def main():
         device=device,
         k=3)
 
-    date_time_str = datetime.now().strftime("%m_%d_%H_%M")
     intrinsic_on  = False
+    date_time_str = datetime.now().strftime("%m_%d_%H_%M")
     file_name     = domain_name + "_" + str(date_time_str) + "_" + task_name + "_" + "TD3_AE_Detach_True" + "_Intrinsic_" + str(intrinsic_on)
 
     train(env, model_policy, file_name, intrinsic_on, seed)

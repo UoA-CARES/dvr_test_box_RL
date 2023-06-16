@@ -8,62 +8,72 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
+import copy
 import numpy as np
+
 from skimage.metrics import structural_similarity as ssim
 
-from networks import Actor
-from networks import Critic
-from networks import Encoder
-from networks import Decoder
+# from networks import Actor
+# from networks import Critic
+# from networks import Encoder
+# from networks import Decoder
 
 
 from networks import EPPM  # Probabilistic Ensemble
 from networks import EPDM  # Deterministic Ensemble
 
 
+
 class Algorithm:
-    def __init__(self, latent_size, action_num, device, k, probabilistic=False):
-
-        self.latent_size = latent_size
-        self.action_num  = action_num
-        self.device      = device
-
-        self.probabilistic = probabilistic
-
-        self.k = k*3  # numer of stack frames, K*3  if I am using color images
+    def __init__(self,
+                 encoder_network,
+                 decoder_network,
+                 actor_network,
+                 critic_network,
+                 action_num,
+                 latent_size,
+                 device,
+                 probabilistic=False
+                 ):
 
         self.gamma = 0.99
         self.tau   = 0.005
         self.ensemble_size = 10
+        self.latent_size   = latent_size
 
         self.learn_counter      = 0
         self.policy_update_freq = 2
 
-        self.encoder = Encoder(latent_dim=self.latent_size, k=self.k).to(self.device)
-        self.decoder = Decoder(latent_dim=self.latent_size, k=self.k).to(self.device)
 
-        self.actor  = Actor(self.latent_size, self.action_num, self.encoder).to(self.device)
-        self.critic = Critic(self.latent_size, self.action_num, self.encoder).to(self.device)
+        self.action_num = action_num
+        self.device = device
 
-        self.actor_target  = Actor(self.latent_size, self.action_num, self.encoder).to(self.device)
-        self.critic_target = Critic(self.latent_size, self.action_num, self.encoder).to(self.device)
+        self.probabilistic = probabilistic
 
-        self.critic_target.load_state_dict(self.critic.state_dict())
-        self.actor_target.load_state_dict(self.actor.state_dict())
+        self.encoder = encoder_network.to(device)
+        self.decoder = decoder_network.to(device)
+
+        self.actor  = actor_network.to(device)
+        self.critic = critic_network.to(device)
+
+        self.actor_target  = copy.deepcopy(self.actor).to(device)
+        self.critic_target = copy.deepcopy(self.critic).to(device)
+
+        # Necessary for make the same encoder in the whole algorithm
+        self.actor_target.encoder  = self.encoder
+        self.critic_target.encoder = self.encoder
+
 
         self.epm = nn.ModuleList()
+        networks = [EPDM(self.latent_size, self.action_num) for _ in range(self.ensemble_size)]
 
-        if self.probabilistic:
-            networks = [EPPM(self.latent_size, self.action_num) for _ in range(self.ensemble_size)]
-        else:
-            networks = [EPDM(self.latent_size, self.action_num) for _ in range(self.ensemble_size)]
         self.epm.extend(networks)
         self.epm.to(self.device)
 
         lr_actor   = 1e-4
         lr_critic  = 1e-3
-        self.actor_optimizer   = torch.optim.Adam(self.actor.parameters(),   lr=lr_actor)
-        self.critic_optimizer  = torch.optim.Adam(self.critic.parameters(),  lr=lr_critic)
+        self.actor_optimizer  = torch.optim.Adam(self.actor.parameters(),   lr=lr_actor)
+        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(),  lr=lr_critic)
 
         lr_encoder = 1e-3
         lr_decoder = 1e-3
@@ -73,6 +83,59 @@ class Algorithm:
         lr_epm      = 1e-4
         w_decay_epm = 1e-3
         self.epm_optimizers = [torch.optim.Adam(self.epm[i].parameters(), lr=lr_epm, weight_decay=w_decay_epm) for i in range(self.ensemble_size)]
+
+# class Algorithm:
+#     def __init__(self, latent_size, action_num, device, k, probabilistic=False):
+#
+#         self.latent_size = latent_size
+#         self.action_num  = action_num
+#         self.device      = device
+#
+#         self.probabilistic = probabilistic
+#
+#         self.k = k*3  # number of stack frames, K*3  if I am using color images
+#
+#         self.gamma = 0.99
+#         self.tau   = 0.005
+#         self.ensemble_size = 10
+#
+#         self.learn_counter      = 0
+#         self.policy_update_freq = 2
+#
+#         self.encoder = Encoder(latent_dim=self.latent_size, k=self.k).to(self.device)
+#         self.decoder = Decoder(latent_dim=self.latent_size, k=self.k).to(self.device)
+#
+#         self.actor  = Actor(self.latent_size, self.action_num, self.encoder).to(self.device)
+#         self.critic = Critic(self.latent_size, self.action_num, self.encoder).to(self.device)
+#
+#         self.actor_target  = Actor(self.latent_size, self.action_num, self.encoder).to(self.device)
+#         self.critic_target = Critic(self.latent_size, self.action_num, self.encoder).to(self.device)
+#
+#         self.critic_target.load_state_dict(self.critic.state_dict())
+#         self.actor_target.load_state_dict(self.actor.state_dict())
+#
+#         self.epm = nn.ModuleList()
+#
+#         if self.probabilistic:
+#             networks = [EPPM(self.latent_size, self.action_num) for _ in range(self.ensemble_size)]
+#         else:
+#             networks = [EPDM(self.latent_size, self.action_num) for _ in range(self.ensemble_size)]
+#         self.epm.extend(networks)
+#         self.epm.to(self.device)
+#
+#         lr_actor   = 1e-4
+#         lr_critic  = 1e-3
+#         self.actor_optimizer  = torch.optim.Adam(self.actor.parameters(),   lr=lr_actor)
+#         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(),  lr=lr_critic)
+#
+#         lr_encoder = 1e-3
+#         lr_decoder = 1e-3
+#         self.encoder_optimizer = torch.optim.Adam(self.encoder.parameters(), lr=lr_encoder)
+#         self.decoder_optimizer = torch.optim.Adam(self.decoder.parameters(), lr=lr_decoder, weight_decay=1e-7)
+#
+#         lr_epm      = 1e-4
+#         w_decay_epm = 1e-3
+#         self.epm_optimizers = [torch.optim.Adam(self.epm[i].parameters(), lr=lr_epm, weight_decay=w_decay_epm) for i in range(self.ensemble_size)]
 
     def get_action_from_policy(self, state, evaluation=False, noise_scale=0.1):
         self.actor.eval()
@@ -88,13 +151,6 @@ class Algorithm:
                 action = np.clip(action, -1, 1)
         self.actor.train()
         return action
-
-    # def get_representation(self, state):
-    #     with torch.no_grad():
-    #         state_tensor = torch.FloatTensor(state).to(self.device)
-    #         state_tensor = state_tensor.unsqueeze(0)
-    #         z_vector     = self.encoder(state_tensor)
-    #         return z_vector.cpu().numpy().flatten()
 
 
     def get_intrinsic_values(self, state, action, next_state, plot_flag=False):
@@ -167,7 +223,7 @@ class Algorithm:
             reconstruction_stack = rec_img.cpu().numpy()[0]           # --> (k , 84 ,84)
 
             target_images     = original_stack_imgs / 255
-            ssim_index_total  = ssim(target_images, reconstruction_stack, full=False, data_range=original_stack_imgs.max() - original_stack_imgs.min(), channel_axis=0)
+            ssim_index_total  = ssim(target_images, reconstruction_stack, full=False, data_range=target_images.max() - target_images.min(), channel_axis=0)
             novelty_rate      = 1 - ssim_index_total
 
             if flag:
