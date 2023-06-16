@@ -192,28 +192,28 @@ def main():
     number_stack_frames = 3
     k = number_stack_frames * 3
 
-    encoder = Encoder(latent_dim=latent_size, k=k)
-    decoder = Decoder(latent_dim=latent_size, k=k)
-
-    actor  = Actor(latent_size, action_size, encoder)
-    critic = Critic(latent_size, action_size, encoder)
+    # encoder = Encoder(latent_dim=latent_size, k=k)
+    # decoder = Decoder(latent_dim=latent_size, k=k)
+    #
+    # actor  = Actor(latent_size, action_size, encoder)
+    # critic = Critic(latent_size, action_size, encoder)
+    #
+    # model_policy = Algorithm(
+    #     encoder,
+    #     decoder,
+    #     actor,
+    #     critic,
+    #     action_size,
+    #     latent_size,
+    #     device
+    # )
 
     model_policy = Algorithm(
-        encoder,
-        decoder,
-        actor,
-        critic,
-        action_size,
-        latent_size,
-        device
-    )
+        latent_size=latent_size,
+        action_num=action_size,
+        device=device,
+        k=number_stack_frames)
 
-    # model_policy = Algorithm(
-    #     latent_size=latent_size,
-    #     action_num=action_size,
-    #     device=device,
-    #     k=number_stack_frames)
-    #
 
     intrinsic_on  = False
     date_time_str = datetime.now().strftime("%m_%d_%H_%M")
