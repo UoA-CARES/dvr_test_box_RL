@@ -8,56 +8,47 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
-import copy
 import numpy as np
-
 from skimage.metrics import structural_similarity as ssim
 
 
-from networks import EPPM  # Probabilistic Ensemble
+from networks import Actor
+from networks import Critic
+from networks import Encoder
+from networks import Decoder
+
 from networks import EPDM  # Deterministic Ensemble
 
 
-
 class Algorithm:
-    def __init__(self,
-                 encoder_network,
-                 decoder_network,
-                 actor_network,
-                 critic_network,
-                 action_num,
-                 latent_size,
-                 device,
-                 probabilistic=False
-                 ):
+    def __init__(self, latent_size, action_num, device, k, probabilistic=False):
+
+        self.latent_size = latent_size
+        self.action_num  = action_num
+        self.device      = device
+
+        self.probabilistic = probabilistic
+
+        self.k = k*3  # numer of stack frames, K*3  if I am using color images
 
         self.gamma = 0.99
         self.tau   = 0.005
         self.ensemble_size = 10
-        self.latent_size   = latent_size
 
         self.learn_counter      = 0
         self.policy_update_freq = 2
 
+        self.encoder = Encoder(latent_dim=self.latent_size, k=self.k).to(self.device)
+        self.decoder = Decoder(latent_dim=self.latent_size, k=self.k).to(self.device)
 
-        self.action_num = action_num
-        self.device = device
+        self.actor  = Actor(self.latent_size, self.action_num, self.encoder).to(self.device)
+        self.critic = Critic(self.latent_size, self.action_num, self.encoder).to(self.device)
 
-        self.probabilistic = probabilistic
+        self.actor_target  = Actor(self.latent_size, self.action_num, self.encoder).to(self.device)
+        self.critic_target = Critic(self.latent_size, self.action_num, self.encoder).to(self.device)
 
-        self.encoder = encoder_network.to(device)
-        self.decoder = decoder_network.to(device)
-
-        self.actor  = actor_network.to(device)
-        self.critic = critic_network.to(device)
-
-        self.actor_target  = copy.deepcopy(self.actor).to(device)
-        self.critic_target = copy.deepcopy(self.critic).to(device)
-
-        # Necessary for make the same encoder in the whole algorithm
-        self.actor_target.encoder_net  = self.encoder
-        self.critic_target.encoder_net = self.encoder
-
+        self.critic_target.load_state_dict(self.critic.state_dict())
+        self.actor_target.load_state_dict(self.actor.state_dict())
 
         self.epm = nn.ModuleList()
         networks = [EPDM(self.latent_size, self.action_num) for _ in range(self.ensemble_size)]
@@ -98,7 +89,6 @@ class Algorithm:
     def get_intrinsic_values(self, state, action, next_state, plot_flag=False):
 
         with torch.no_grad():
-
             state_tensor  = torch.FloatTensor(state).to(self.device)
             state_tensor  = state_tensor.unsqueeze(0)
 
@@ -231,22 +221,17 @@ class Algorithm:
         states, actions, rewards, next_states, dones = experiences
         batch_size = len(states)
 
-        states      = torch.FloatTensor(states).to(self.device)
-        actions     = torch.FloatTensor(actions).to(self.device)
-        rewards     = torch.FloatTensor(rewards).to(self.device)
-        next_states = torch.FloatTensor(next_states).to(self.device)
-        dones       = torch.LongTensor(dones).to(self.device)
-
-        # # Convert into tensor
-        # states      = torch.FloatTensor(np.asarray(states)).to(self.device)
-        # actions     = torch.FloatTensor(np.asarray(actions)).to(self.device)
-        # rewards     = torch.FloatTensor(np.asarray(rewards)).to(self.device)
-        # next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
-        # dones       = torch.LongTensor(np.asarray(dones)).to(self.device)
+        # Convert into tensor
+        states      = torch.FloatTensor(np.asarray(states)).to(self.device)
+        actions     = torch.FloatTensor(np.asarray(actions)).to(self.device)
+        rewards     = torch.FloatTensor(np.asarray(rewards)).to(self.device)
+        next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
+        dones       = torch.LongTensor(np.asarray(dones)).to(self.device)
 
         # Reshape to batch_size
         rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
         dones   = dones.unsqueeze(0).reshape(batch_size, 1)
+
 
         with torch.no_grad():
             next_actions = self.actor_target(next_states)
@@ -311,11 +296,11 @@ class Algorithm:
 
 
     def train_predictive_model(self, experiences):
-        states, actions, _, next_states, _ = experiences
+        states, actions, next_states = experiences
 
-        states      = torch.FloatTensor(states).to(self.device)
-        actions     = torch.FloatTensor(actions).to(self.device)
-        next_states = torch.FloatTensor(next_states).to(self.device)
+        states      = torch.FloatTensor(np.array(states)).to(self.device)
+        actions     = torch.FloatTensor(np.asarray(actions)).to(self.device)
+        next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
 
         with torch.no_grad():
             latent_state      = self.encoder(states, detach=True)

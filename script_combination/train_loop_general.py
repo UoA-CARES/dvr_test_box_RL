@@ -4,24 +4,22 @@ import gym
 import time
 import torch
 import random
-
-import numpy as np
-import pandas as pd
 from datetime import datetime
-import matplotlib.pyplot as plt
+
 
 import logging
 logging.basicConfig(level=logging.INFO)
 
-from FrameStack_3CH import FrameStack
-from cares_reinforcement_learning.util   import helpers as hlp
-
 from cares_reinforcement_learning.memory import MemoryBuffer
-from cares_reinforcement_learning.algorithm.policy.NaSATD3 import NASA_TD3
-from cares_reinforcement_learning.networks.NaSATD3 import Actor
-from cares_reinforcement_learning.networks.NaSATD3 import Critic
-from cares_reinforcement_learning.networks.NaSATD3 import Encoder
-from cares_reinforcement_learning.networks.NaSATD3 import Decoder
+from cares_reinforcement_learning.util import helpers as hlp
+
+from Algorithm import Algorithm
+from FrameStack_3CH import FrameStack
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
 
 def plot_reward_curve(data_reward, filename):
@@ -32,7 +30,8 @@ def plot_reward_curve(data_reward, filename):
     plt.savefig(f"plots/{filename}.png")
     plt.close()
 
-def train(env, agent,  file_name, intrinsic_on, k):
+
+def train(env, model_policy,  file_name, intrinsic_on, k):
     max_steps_training    = 100_000
     max_steps_exploration = 1_000
 
@@ -43,6 +42,7 @@ def train(env, agent,  file_name, intrinsic_on, k):
 
     min_action_value = env.action_space.low[0]
     max_action_value = env.action_space.high[0]
+    action_size = env.action_space.shape[0]
 
     #-----------------------------------#
     torch.manual_seed(seed)
@@ -51,6 +51,8 @@ def train(env, agent,  file_name, intrinsic_on, k):
     random.seed(seed)
     env.action_space.seed(seed)
     # -----------------------------------#
+
+    #memory = CustomMemoryBuffer(action_size)
 
     memory       = MemoryBuffer()
     frames_stack = FrameStack(env, k, seed)
@@ -70,7 +72,7 @@ def train(env, agent,  file_name, intrinsic_on, k):
             action_env = env.action_space.sample()  # action range the env uses [e.g. -2 , 2 for pendulum]
             action     = hlp.normalize(action_env, max_action_value, min_action_value)  # algorithm range [-1, 1]
         else:
-            action     = agent.select_action_from_policy(state)
+            action     = model_policy.get_action_from_policy(state)
             action_env = hlp.denormalize(action, max_action_value, min_action_value)
 
         next_state, reward_extrinsic, done, truncated, info = frames_stack.step(action_env)
@@ -78,39 +80,41 @@ def train(env, agent,  file_name, intrinsic_on, k):
         if intrinsic_on and total_step_counter >= max_steps_exploration:
             a = 0.5
             b = 0.5
-            surprise_rate, novelty_rate = agent.get_intrinsic_values(state, action, next_state)
+            surprise_rate, novelty_rate = model_policy.get_intrinsic_values(state, action, next_state)
             reward_surprise = surprise_rate * a
             reward_novelty  = novelty_rate  * b
             logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
             total_reward = reward_extrinsic + reward_surprise + reward_novelty
+
         else:
             total_reward = reward_extrinsic
 
         memory.add(state=state, action=action, reward=total_reward, next_state=next_state, done=done)
         state = next_state
 
-        episode_reward += reward_extrinsic  # just for plotting and evaluation purposes use the reward as it is
+        episode_reward += reward_extrinsic  # just for plotting and evaluation purposes use the  reward as it is
 
         if total_step_counter >= max_steps_exploration:
             num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
 
             for _ in range(num_updates):
                 experience = memory.sample(batch_size)
+                # model_policy.train_policy(experience)
 
-                agent.train_policy((
+                model_policy.train_policy((
                     experience['state'],
                     experience['action'],
                     experience['reward'],
                     experience['next_state'],
                     experience['done'],
                 ))
-
-                if intrinsic_on:
-                    agent.train_predictive_model((
-                        experience['state'],
-                        experience['action'],
-                        experience['next_state']
-                    ))
+                #
+                # if intrinsic_on:
+                #     model_policy.train_predictive_model((
+                #         experience['state'],
+                #         experience['action'],
+                #         experience['next_state'],
+                #     ))
 
         if done or truncated:
             episode_duration = time.time() - start_time
@@ -129,14 +133,14 @@ def train(env, agent,  file_name, intrinsic_on, k):
             if episode_num % 10 == 0:
                 plot_reward_curve(historical_reward, filename=file_name)
                 print("--------------------------------------------")
-                evaluation_loop(env, agent, frames_stack, total_step_counter, max_action_value, min_action_value)
+                evaluation_loop(env, model_policy, frames_stack, total_step_counter, max_action_value, min_action_value)
                 print("--------------------------------------------")
 
-    agent.save_models(filename=file_name)
+    model_policy.save_models(filename=file_name)
     hlp.plot_reward_curve(historical_reward)
 
 
-def evaluation_loop(env, agent, frames_stack, total_counter, max_action_value, min_action_value):
+def evaluation_loop(env, model_policy, frames_stack, total_counter, max_action_value, min_action_value):
     max_steps_evaluation = 1_000
 
     episode_timesteps = 0
@@ -147,17 +151,20 @@ def evaluation_loop(env, agent, frames_stack, total_counter, max_action_value, m
     frame = grab_frame(env)
 
     fps = 30
-    video_name = f'videos/Result_nasa_td3_Gym_{total_counter+1}.mp4'
+    video_name = f'videos/Result_Gym_{total_counter+1}.mp4'
     height, width, channels = frame.shape
-    #video = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
+    video = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
 
     for total_step_counter in range(int(max_steps_evaluation)):
         episode_timesteps += 1
-        action     = agent.select_action_from_policy(state, evaluation=True)
+
+        action     = model_policy.get_action_from_policy(state, evaluation=True)
         action_env = hlp.denormalize(action, max_action_value, min_action_value)
+
         state, reward_extrinsic, done, truncated, info = frames_stack.step(action_env)
+
         episode_reward += reward_extrinsic
-        #video.write(grab_frame(env))
+        video.write(grab_frame(env))
 
         if done or truncated:
             logging.info(f" EVALUATION | Eval Episode {episode_num + 1} was completed with {episode_timesteps} steps | Reward= {episode_reward:.3f}")
@@ -165,7 +172,8 @@ def evaluation_loop(env, agent, frames_stack, total_counter, max_action_value, m
             episode_reward    = 0
             episode_timesteps = 0
             episode_num       += 1
-    #video.release()
+
+    video.release()
 
 
 def grab_frame(env):
@@ -182,33 +190,18 @@ def main():
     action_size  = env.action_space.shape[0]
     latent_size  = 50
     number_stack_frames = 3
-    k = number_stack_frames * 3
 
-    encoder = Encoder(latent_dim=latent_size, k=k)
-    decoder = Decoder(latent_dim=latent_size, k=k)
-    actor   = Actor(latent_size, action_size, encoder)
-    critic  = Critic(latent_size, action_size, encoder)
+    model_policy = Algorithm(
+        latent_size=latent_size,
+        action_num=action_size,
+        device=device,
+        k=number_stack_frames)
 
-    gamma = 0.99
-    tau   = 0.005
-
-    agent = NASA_TD3(
-        encoder,
-        decoder,
-        actor,
-        critic,
-        gamma,
-        tau,
-        action_size,
-        latent_size,
-        device
-    )
-
-    intrinsic_on  = False
+    intrinsic_on = False
     date_time_str = datetime.now().strftime("%m_%d_%H_%M")
-    file_name     = env_gym_name  + "_" + str(date_time_str) + "_" + "NASA_TD3" + "_Intrinsic_" + str(intrinsic_on)
+    file_name     = env_gym_name  + "_" + str(date_time_str) + "_" + "TD3_AE_Surprise_Novelty" + "_Intrinsic_" + str(intrinsic_on)
 
-    train(env, agent, file_name, intrinsic_on, number_stack_frames)
+    train(env, model_policy, file_name, intrinsic_on, number_stack_frames)
 
 
 if __name__ == '__main__':
