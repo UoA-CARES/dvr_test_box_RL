@@ -166,6 +166,7 @@ def evaluation_loop(env, agent, frames_stack, total_counter, max_action_value, m
             episode_reward    = 0
             episode_timesteps = 0
             episode_num       += 1
+
     video.release()
 
 

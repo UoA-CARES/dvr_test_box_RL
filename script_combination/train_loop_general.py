@@ -31,19 +31,18 @@ def plot_reward_curve(data_reward, filename):
     plt.close()
 
 
-def train(env, model_policy,  file_name, intrinsic_on, k):
+def train(env, model_policy,  file_name, intrinsic_on, number_stack_frames):
     max_steps_training    = 100_000
     max_steps_exploration = 1_000
 
     batch_size = 128
     seed       = 1 # 571 seed gives no that great results
     G          = 1
-    k          = k
+    k          = number_stack_frames
 
     min_action_value = env.action_space.low[0]
     max_action_value = env.action_space.high[0]
     action_size = env.action_space.shape[0]
-
     #-----------------------------------#
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -51,11 +50,8 @@ def train(env, model_policy,  file_name, intrinsic_on, k):
     random.seed(seed)
     env.action_space.seed(seed)
     # -----------------------------------#
-
-    #memory = CustomMemoryBuffer(action_size)
-
     memory       = MemoryBuffer()
-    frames_stack = FrameStack(env, k, seed)
+    frames_stack = FrameStack(env, k)
 
     episode_timesteps = 0
     episode_reward    = 0
@@ -108,13 +104,13 @@ def train(env, model_policy,  file_name, intrinsic_on, k):
                     experience['next_state'],
                     experience['done'],
                 ))
-                #
-                # if intrinsic_on:
-                #     model_policy.train_predictive_model((
-                #         experience['state'],
-                #         experience['action'],
-                #         experience['next_state'],
-                #     ))
+
+                if intrinsic_on:
+                    model_policy.train_predictive_model((
+                        experience['state'],
+                        experience['action'],
+                        experience['next_state'],
+                    ))
 
         if done or truncated:
             episode_duration = time.time() - start_time
@@ -133,14 +129,14 @@ def train(env, model_policy,  file_name, intrinsic_on, k):
             if episode_num % 10 == 0:
                 plot_reward_curve(historical_reward, filename=file_name)
                 print("--------------------------------------------")
-                evaluation_loop(env, model_policy, frames_stack, total_step_counter, max_action_value, min_action_value)
+                evaluation_loop(env, model_policy, frames_stack, total_step_counter, max_action_value, min_action_value, file_name)
                 print("--------------------------------------------")
 
     model_policy.save_models(filename=file_name)
     hlp.plot_reward_curve(historical_reward)
 
 
-def evaluation_loop(env, model_policy, frames_stack, total_counter, max_action_value, min_action_value):
+def evaluation_loop(env, model_policy, frames_stack, total_counter, max_action_value, min_action_value, file_name):
     max_steps_evaluation = 1_000
 
     episode_timesteps = 0
@@ -151,19 +147,17 @@ def evaluation_loop(env, model_policy, frames_stack, total_counter, max_action_v
     frame = grab_frame(env)
 
     fps = 30
-    video_name = f'videos/Result_Gym_{total_counter+1}.mp4'
+    video_name = f'videos/{file_name}_{total_counter+1}.mp4'
     height, width, channels = frame.shape
     video = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
 
     for total_step_counter in range(int(max_steps_evaluation)):
         episode_timesteps += 1
-
         action     = model_policy.get_action_from_policy(state, evaluation=True)
         action_env = hlp.denormalize(action, max_action_value, min_action_value)
-
         state, reward_extrinsic, done, truncated, info = frames_stack.step(action_env)
-
         episode_reward += reward_extrinsic
+
         video.write(grab_frame(env))
 
         if done or truncated:
