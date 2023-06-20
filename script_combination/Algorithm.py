@@ -298,7 +298,7 @@ class Algorithm:
     def train_predictive_model(self, experiences):
         states, actions, next_states = experiences
 
-        states      = torch.FloatTensor(np.array(states)).to(self.device)
+        states      = torch.FloatTensor(np.asarray(states)).to(self.device)
         actions     = torch.FloatTensor(np.asarray(actions)).to(self.device)
         next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
 

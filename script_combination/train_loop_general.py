@@ -197,7 +197,7 @@ def main():
         device=device,
         k=number_stack_frames)
 
-    intrinsic_on = False
+    intrinsic_on  = False
     date_time_str = datetime.now().strftime("%m_%d_%H_%M")
     file_name     = env_gym_name  + "_" + str(date_time_str) + "_" + "TD3_AE_Surprise_Novelty" + "_Intrinsic_" + str(intrinsic_on)
 

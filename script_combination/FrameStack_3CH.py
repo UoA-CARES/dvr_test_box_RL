@@ -4,9 +4,8 @@ from collections import deque
 
 
 class FrameStack:
-    def __init__(self, env, k=3, seed=123):
+    def __init__(self, env, k=3):
         self.env  = env
-        self.seed = seed
         self.k    = k  # number of frames to be stacked
         self.frames_stacked = deque([], maxlen=k)
 

@@ -3,9 +3,8 @@ from collections import deque
 
 
 class FrameStack:
-    def __init__(self, env, k=3, seed=123):
+    def __init__(self, env, k=3):
         self.env  = env
-        self.seed = seed
         self.k    = k  # number of frames to be stacked
         self.frames_stacked = deque([], maxlen=k)
 
@@ -26,9 +25,3 @@ class FrameStack:
         self.frames_stacked.append(frame)
         stacked_frames = np.concatenate(list(self.frames_stacked), axis=0)
         return stacked_frames, reward, done
-
-    # def preprocessing_image(self, image_array):
-    #     #output_img = cv2.resize(image_array, (84, 84), interpolation=cv2.INTER_AREA)
-    #     #output_img = cv2.normalize(output_img, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-    #     image_array = np.moveaxis(image_array, -1, 0)
-    #     return image_array
