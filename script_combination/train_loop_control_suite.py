@@ -43,14 +43,13 @@ def plot_reconstruction_img(original, reconstruction):
     plt.imshow(difference, vmin=0, vmax=1)
     plt.pause(0.01)
 
-def train(env, agent, file_name, intrinsic_on, number_stack_frames, seed):
+def train(env, agent, file_name, intrinsic_on, number_stack_frames):
     # Hyperparameters
     # ------------------------------------#
     max_steps_training    = 1_000_000
     max_steps_exploration = 1_000
 
     batch_size = 128
-    seed       = seed
     G          = 1
     k          = number_stack_frames
     # ------------------------------------#
@@ -63,20 +62,12 @@ def train(env, agent, file_name, intrinsic_on, number_stack_frames, seed):
     min_action_value = action_spec.minimum[0]  # --> -1
     # ------------------------------------#
 
-    # set seeds
-    # ------------------------------------#
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    # ------------------------------------#
-
     # Needed classes
     # ------------------------------------#
-
     memory       = MemoryBuffer()
     frames_stack = FrameStack(env, k)
     # ------------------------------------#
+
     # Training Loop
     # ------------------------------------#
     episode_timesteps = 0
@@ -212,6 +203,14 @@ def main():
     latent_size = 50
     number_stack_frames = 3
 
+    # set seeds
+    #---------------------------------------
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    #---------------------------------------
+
     agent = Algorithm(
         latent_size=latent_size,
         action_num=action_size,
@@ -222,7 +221,7 @@ def main():
     date_time_str = datetime.now().strftime("%m_%d_%H_%M")
     file_name     = domain_name + "_" + str(date_time_str) + "_" + task_name + "_" + "NASA_TD3" + "_Intrinsic_" + str(intrinsic_on)
 
-    train(env, agent, file_name, intrinsic_on, number_stack_frames, seed)
+    train(env, agent, file_name, intrinsic_on, number_stack_frames)
 
 
 if __name__ == '__main__':

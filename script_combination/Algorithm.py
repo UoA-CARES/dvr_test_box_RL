@@ -25,7 +25,6 @@ class Algorithm:
         self.action_num  = action_num
         self.device      = device
 
-
         self.k = k*3  # numer of stack frames, K*3  if I am using color images
 
         self.gamma = 0.99

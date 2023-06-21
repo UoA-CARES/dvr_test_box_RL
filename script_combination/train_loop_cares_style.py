@@ -52,19 +52,12 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
     max_steps_exploration = 1_000
 
     batch_size = 128
-    seed       = 1 # 571 seed gives no that great results
     G          = 1
     k          = number_stack_frames
 
     min_action_value = env.action_space.low[0]
     max_action_value = env.action_space.high[0]
-    #-----------------------------------#
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    env.action_space.seed(seed)
-    # -----------------------------------#
+
     memory       = MemoryBuffer()
     frames_stack = FrameStack(env, k)
 
@@ -194,13 +187,24 @@ def grab_frame(env):
 
 def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    seed = 1
 
     env_gym_name = "Pendulum-v1" # BipedalWalker-v3, Pendulum-v1, HalfCheetah-v4"
     env          = gym.make(env_gym_name, render_mode="rgb_array")
+    env.reset(seed=seed)
+
     action_size  = env.action_space.shape[0]
     latent_size  = 50
     number_stack_frames = 3
     k = number_stack_frames * 3
+
+    # ---------------------------------------#
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    env.action_space.seed(seed)
+    # ---------------------------------------#
 
     encoder = Encoder(latent_dim=latent_size, k=k)
     decoder = Decoder(latent_dim=latent_size, k=k)

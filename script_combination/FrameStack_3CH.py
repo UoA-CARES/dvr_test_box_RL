@@ -10,7 +10,6 @@ class FrameStack:
         self.frames_stacked = deque([], maxlen=k)
 
     def reset(self):
-        #_, _ = self.env.reset(seed=self.seed)
         _, _ = self.env.reset()
         obs = self.env.render()
         obs = self.preprocessing_image(obs)
