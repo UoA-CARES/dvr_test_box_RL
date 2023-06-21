@@ -6,7 +6,6 @@ logging.basicConfig(level=logging.INFO)
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
 
 import numpy as np
 from skimage.metrics import structural_similarity as ssim
@@ -16,18 +15,16 @@ from networks import Actor
 from networks import Critic
 from networks import Encoder
 from networks import Decoder
-
 from networks import EPDM  # Deterministic Ensemble
 
 
 class Algorithm:
-    def __init__(self, latent_size, action_num, device, k, probabilistic=False):
+    def __init__(self, latent_size, action_num, device, k):
 
         self.latent_size = latent_size
         self.action_num  = action_num
         self.device      = device
 
-        self.probabilistic = probabilistic
 
         self.k = k*3  # numer of stack frames, K*3  if I am using color images
 
@@ -52,7 +49,6 @@ class Algorithm:
 
         self.epm = nn.ModuleList()
         networks = [EPDM(self.latent_size, self.action_num) for _ in range(self.ensemble_size)]
-
         self.epm.extend(networks)
         self.epm.to(self.device)
 
@@ -70,7 +66,7 @@ class Algorithm:
         w_decay_epm = 1e-3
         self.epm_optimizers = [torch.optim.Adam(self.epm[i].parameters(), lr=lr_epm, weight_decay=w_decay_epm) for i in range(self.ensemble_size)]
 
-    def get_action_from_policy(self, state, evaluation=False, noise_scale=0.1):
+    def select_action_from_policy(self, state, evaluation=False, noise_scale=0.1):
         self.actor.eval()
         with torch.no_grad():
             state_tensor = torch.FloatTensor(state).to(self.device)
@@ -84,131 +80,6 @@ class Algorithm:
                 action = np.clip(action, -1, 1)
         self.actor.train()
         return action
-
-
-    def get_intrinsic_values(self, state, action, next_state, plot_flag=False):
-
-        with torch.no_grad():
-            state_tensor  = torch.FloatTensor(state).to(self.device)
-            state_tensor  = state_tensor.unsqueeze(0)
-
-            next_state_tensor = torch.FloatTensor(next_state).to(self.device)
-            next_state_tensor = next_state_tensor.unsqueeze(0)
-
-            action_tensor = torch.FloatTensor(action).to(self.device)
-            action_tensor = action_tensor.unsqueeze(0)
-
-            surprise_rate = self.get_surprise_rate(state_tensor, action_tensor, next_state_tensor)
-            novelty_rate  = self.get_novelty_rate(state_tensor, plot_flag)
-
-            return surprise_rate, novelty_rate
-
-
-    def get_surprise_rate(self, state_tensor, action_tensor, next_state_tensor):
-
-        with torch.no_grad():
-            latent_state      = self.encoder(state_tensor, detach=True)
-            latent_next_state = self.encoder(next_state_tensor, detach=True)
-
-            if self.probabilistic:
-                predict_mean_set, predict_std_set = [], []
-                for network in self.epm:
-                    network.eval()
-                    predicted_distribution = network(latent_state, action_tensor)
-                    mean = predicted_distribution.mean
-                    std  = predicted_distribution.stddev
-                    predict_mean_set.append(mean.detach().cpu().numpy())
-                    predict_std_set.append(std.detach().cpu().numpy())
-
-                ensemble_prediction_means = np.concatenate(predict_mean_set, axis=0)
-                ensemble_prediction_stds  = np.concatenate(predict_std_set, axis=0)
-
-                z_next_latent_prediction = np.mean(ensemble_prediction_means, axis=0)
-                uncertainty_prediction   = np.mean(ensemble_prediction_stds, axis=0) # std of each element in the z _vector
-
-                avr_uncertainty = np.mean(uncertainty_prediction) # avr uncertainty in the prediction
-
-                return avr_uncertainty
-
-            else:
-                predict_vector_set = []
-                for network in self.epm:
-                    network.eval()
-                    predicted_vector = network(latent_state, action_tensor)
-                    predict_vector_set.append(predicted_vector.detach().cpu().numpy())
-
-                ensemble_vector = np.concatenate(predict_vector_set, axis=0)
-
-                z_next_latent_prediction = np.mean(ensemble_vector, axis=0) # prediction vector average among the ensembles models
-                z_next_latent_true       = latent_next_state.detach().cpu().numpy()[0]
-                mse = (np.square(z_next_latent_prediction - z_next_latent_true)).mean()
-                return mse
-
-
-    def get_novelty_rate(self, state_tensor_img, flag):
-
-        with torch.no_grad():
-            z_vector = self.encoder(state_tensor_img)
-            rec_img  = self.decoder(z_vector) # Note: rec_img is a stack of k images --> (1, k , 84 ,84),
-
-            original_stack_imgs  = state_tensor_img.cpu().numpy()[0]  # --> (k , 84 ,84)
-            reconstruction_stack = rec_img.cpu().numpy()[0]           # --> (k , 84 ,84)
-
-            target_images     = original_stack_imgs / 255
-            ssim_index_total  = ssim(target_images, reconstruction_stack, full=False, data_range=target_images.max() - target_images.min(), channel_axis=0)
-            novelty_rate      = 1 - ssim_index_total
-
-            if flag:
-                self.plot_img_reconstruction(original_stack_imgs, reconstruction_stack)
-
-            return novelty_rate
-
-    def plot_img_reconstruction(self, original_img, reconstruction_img):
-
-        original_img       = np.moveaxis(original_img, 0, -1)
-        reconstruction_img = np.moveaxis(reconstruction_img, 0, -1)
-
-        original_img       = np.array_split(original_img, 3, axis=2)
-        reconstruction_img = np.array_split(reconstruction_img, 3, axis=2)
-
-        plt.subplot(2, 3, 1)
-        plt.title("Image Input one")
-        #plt.imshow(original_img[0], vmin=0, vmax=1)
-        plt.imshow(original_img[0])
-
-        plt.subplot(2, 3, 2)
-        plt.title("Image Input two")
-        #plt.imshow(original_img[1], vmin=0, vmax=1)
-        plt.imshow(original_img[1])
-
-        plt.subplot(2, 3, 3)
-        plt.title("Image Input three")
-        #plt.imshow(original_img[2], vmin=0, vmax=1)
-        plt.imshow(original_img[2])
-
-        plt.subplot(2, 3, 4)
-        plt.title("Image Reconstruction one")
-        #plt.imshow(reconstruction_img[0], vmin=0, vmax=1)
-        plt.imshow(reconstruction_img[0])
-
-        plt.subplot(2, 3, 5)
-        plt.title("Image Reconstruction two")
-        #plt.imshow(reconstruction_img[1], vmin=0, vmax=1)
-        plt.imshow(reconstruction_img[1])
-
-        plt.subplot(2, 3, 6)
-        plt.title("Image Reconstruction three")
-        #plt.imshow(reconstruction_img[2], vmin=0, vmax=1)
-        plt.imshow(reconstruction_img[2])
-
-        # difference = abs(original_img[0] - reconstruction_img[0])
-        # plt.subplot(1, 3, 3)
-        # plt.title("Difference")
-        # plt.imshow(difference, vmin=0, vmax=1)
-
-        #plt.savefig(f"plot_results/AE-TD3_{env_name}_image_reconstruction.png")
-        #plt.show()
-        plt.pause(0.01)
 
     def train_policy(self, experiences):
         self.encoder.train()
@@ -231,7 +102,6 @@ class Algorithm:
         # Reshape to batch_size
         rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
         dones   = dones.unsqueeze(0).reshape(batch_size, 1)
-
 
         with torch.no_grad():
             next_actions = self.actor_target(next_states)
@@ -260,11 +130,11 @@ class Algorithm:
         z_vector = self.encoder(states)
         rec_obs  = self.decoder(z_vector)
 
-        target_images = states / 255 # this because the image is [0-255] and the prediction is [0-1], I did not normalized before to save experiences as Unit8
-        rec_loss      = F.mse_loss(target_images, rec_obs)
+        target_images = states / 255  # this because the image is [0-255] and the prediction is [0-1], I did not normalized before to save experiences as Unit8
+        rec_loss = F.mse_loss(target_images, rec_obs)
 
         latent_loss = (0.5 * z_vector.pow(2).sum(1)).mean()  # add L2 penalty on latent representation
-        ae_loss     = rec_loss + 1e-6 * latent_loss
+        ae_loss = rec_loss + 1e-6 * latent_loss
 
         self.encoder_optimizer.zero_grad()
         self.decoder_optimizer.zero_grad()
@@ -274,7 +144,7 @@ class Algorithm:
 
         # Update Actor
         if self.learn_counter % self.policy_update_freq == 0:
-            actor_q_one, actor_q_two = self.critic(states, self.actor(states, detach_encoder=True),  detach_encoder=True)
+            actor_q_one, actor_q_two = self.critic(states, self.actor(states, detach_encoder=True), detach_encoder=True)
             actor_q_values           = torch.minimum(actor_q_one, actor_q_two)
             actor_loss               = -actor_q_values.mean()
 
@@ -294,6 +164,49 @@ class Algorithm:
 
             # the encoders in target networks are the same of main networks, so I will not update them
 
+    def get_intrinsic_values(self, state, action, next_state, plot_flag=False):
+        with torch.no_grad():
+            state_tensor     = torch.FloatTensor(state).to(self.device)
+            state_tensor      = state_tensor.unsqueeze(0)
+            next_state_tensor = torch.FloatTensor(next_state).to(self.device)
+            next_state_tensor = next_state_tensor.unsqueeze(0)
+            action_tensor     = torch.FloatTensor(action).to(self.device)
+            action_tensor     = action_tensor.unsqueeze(0)
+
+            surprise_rate = self.get_surprise_rate(state_tensor, action_tensor, next_state_tensor)
+            novelty_rate  = self.get_novelty_rate(state_tensor)
+        return surprise_rate, novelty_rate
+
+
+    def get_surprise_rate(self, state_tensor, action_tensor, next_state_tensor):
+        with torch.no_grad():
+            latent_state      = self.encoder(state_tensor, detach=True)
+            latent_next_state = self.encoder(next_state_tensor, detach=True)
+
+            predict_vector_set = []
+            for network in self.epm:
+                network.eval()
+                predicted_vector = network(latent_state, action_tensor)
+                predict_vector_set.append(predicted_vector.detach().cpu().numpy())
+            ensemble_vector = np.concatenate(predict_vector_set, axis=0)
+            z_next_latent_prediction = np.mean(ensemble_vector, axis=0) # prediction vector average among the ensembles models
+            z_next_latent_true       = latent_next_state.detach().cpu().numpy()[0]
+            mse = (np.square(z_next_latent_prediction - z_next_latent_true)).mean()
+            return mse
+
+    def get_novelty_rate(self, state_tensor_img):
+        with torch.no_grad():
+            z_vector = self.encoder(state_tensor_img)
+            rec_img  = self.decoder(z_vector) # Note: rec_img is a stack of k images --> (1, k , 84 ,84),
+
+            original_stack_imgs  = state_tensor_img.cpu().numpy()[0]  # --> (k , 84 ,84)
+            reconstruction_stack = rec_img.cpu().numpy()[0]           # --> (k , 84 ,84)
+
+        target_images     = original_stack_imgs / 255
+        ssim_index_total  = ssim(target_images, reconstruction_stack, full=False, data_range=target_images.max() - target_images.min(), channel_axis=0)
+        novelty_rate      = 1 - ssim_index_total
+        return novelty_rate
+
 
     def train_predictive_model(self, experiences):
         states, actions, next_states = experiences
@@ -306,41 +219,43 @@ class Algorithm:
             latent_state      = self.encoder(states, detach=True)
             latent_next_state = self.encoder(next_states, detach=True)
 
-        if self.probabilistic:
-            for predictive_network, optimizer in zip(self.epm, self.epm_optimizers):
-                predictive_network.train()
-                #Get the Prediction of each model
-                prediction_distribution = predictive_network(latent_state, actions)
-                loss_neg_log_likelihood = - prediction_distribution.log_prob(latent_next_state)
-                loss_neg_log_likelihood = torch.mean(loss_neg_log_likelihood)
-                # Update weights and bias
-                optimizer.zero_grad()
-                loss_neg_log_likelihood.backward()
-                optimizer.step()
-        else:
-            for predictive_network, optimizer in zip(self.epm, self.epm_optimizers):
-                predictive_network.train()
-                # Get the deterministic prediction of each model
-                prediction_vector = predictive_network(latent_state, actions)
-                # Calculate Loss
-                loss = F.mse_loss(prediction_vector, latent_next_state)
-                # Update weights and bias
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+        for predictive_network, optimizer in zip(self.epm, self.epm_optimizers):
+            predictive_network.train()
+            # Get the deterministic prediction of each model
+            prediction_vector = predictive_network(latent_state, actions)
+            # Calculate Loss
+            loss = F.mse_loss(prediction_vector, latent_next_state)
+            # Update weights and bias
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+    def get_reconstruction_for_evaluation(self, state):
+        self.encoder.eval()
+        self.decoder.eval()
+        with torch.no_grad():
+            state_tensor_img = torch.FloatTensor(state).to(self.device)
+            state_tensor_img = state_tensor_img.unsqueeze(0)
+            z_vector = self.encoder(state_tensor_img)
+            rec_img  = self.decoder(z_vector)
+            rec_img  = rec_img.cpu().numpy()[0]  # --> (k , 84 ,84)
+
+        original_img = np.moveaxis(state, 0, -1)  # --> (84 ,84, 3)
+        original_img = np.array_split(original_img, 3, axis=2)
+        rec_img      = np.moveaxis(rec_img, 0, -1)
+        rec_img      = np.array_split(rec_img, 3, axis=2)
+        self.encoder.train()
+        self.decoder.train()
+        return original_img, rec_img
 
     def save_models(self, filename):
         dir_exists = os.path.exists("models")
-
         if not dir_exists:
             os.makedirs("models")
 
-        torch.save(self.actor.state_dict(),  f'models/{filename}_actor.pht')
-        torch.save(self.critic.state_dict(), f'models/{filename}_critic.pht')
-
+        torch.save(self.actor.state_dict(),   f'models/{filename}_actor.pht')
+        torch.save(self.critic.state_dict(),  f'models/{filename}_critic.pht')
         torch.save(self.encoder.state_dict(), f'models/{filename}_encoder.pht')
         torch.save(self.decoder.state_dict(), f'models/{filename}_decoder.pht')
-
-        torch.save(self.epm.state_dict(), f'models/{filename}_ensemble.pht')  # no sure if this is the correct way to solve ensemble
-
+        torch.save(self.epm.state_dict(),     f'models/{filename}_ensemble.pht')  # no sure if this is the correct way to solve ensemble
         print("models has been saved...")

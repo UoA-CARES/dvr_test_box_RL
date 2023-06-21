@@ -1,36 +1,47 @@
 
 import cv2
-from dm_control import suite
 import time
 import torch
 import random
-
-import numpy as np
-import pandas as pd
 from datetime import datetime
-import matplotlib.pyplot as plt
 
 import logging
 logging.basicConfig(level=logging.INFO)
-
-from FrameStack_DMCS import FrameStack
-from cares_reinforcement_learning.util   import helpers as hlp
+from dm_control import suite
 
 from cares_reinforcement_learning.memory import MemoryBuffer
-from cares_reinforcement_learning.algorithm.policy.NaSATD3 import NASA_TD3
-from cares_reinforcement_learning.networks.NaSATD3 import Actor
-from cares_reinforcement_learning.networks.NaSATD3 import Critic
-from cares_reinforcement_learning.networks.NaSATD3 import Encoder
-from cares_reinforcement_learning.networks.NaSATD3 import Decoder
 
+
+from Algorithm import Algorithm
+from FrameStack_DMCS import FrameStack
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
 def plot_reward_curve(data_reward, filename):
     data = pd.DataFrame.from_dict(data_reward)
     data.plot(x='step', y='episode_reward', title="Reward Curve")
     plt.title(filename)
-    # plt.show()
     plt.savefig(f"plots/{filename}.png")
     plt.close()
+
+def plot_reconstruction_img(original, reconstruction):
+    input_img      = original[0]/255
+    reconstruction = reconstruction[0]
+    difference     = abs(input_img - reconstruction)
+
+    plt.subplot(1, 3, 1)
+    plt.title("Image Input")
+    plt.imshow(input_img, vmin=0, vmax=1)
+    plt.subplot(1, 3, 2)
+    plt.title("Image Reconstruction")
+    plt.imshow(reconstruction, vmin=0, vmax=1)
+    plt.subplot(1, 3, 3)
+    plt.title("Difference")
+    plt.imshow(difference, vmin=0, vmax=1)
+    plt.pause(0.01)
 
 def train(env, agent, file_name, intrinsic_on, number_stack_frames, seed):
     # Hyperparameters
@@ -62,17 +73,16 @@ def train(env, agent, file_name, intrinsic_on, number_stack_frames, seed):
 
     # Needed classes
     # ------------------------------------#
+
     memory       = MemoryBuffer()
     frames_stack = FrameStack(env, k)
     # ------------------------------------#
-
     # Training Loop
     # ------------------------------------#
     episode_timesteps = 0
     episode_reward    = 0
     episode_num       = 0
     historical_reward = {"step": [], "episode_reward": []}
-
     start_time = time.time()
     state      = frames_stack.reset()  # for 3 images with color, unit8 , (9, 84 , 84)
 
@@ -107,6 +117,7 @@ def train(env, agent, file_name, intrinsic_on, number_stack_frames, seed):
 
             for _ in range(num_updates):
                 experience = memory.sample(batch_size)
+
                 agent.train_policy((
                     experience['state'],
                     experience['action'],
@@ -148,7 +159,6 @@ def train(env, agent, file_name, intrinsic_on, number_stack_frames, seed):
 
 def evaluation_loop(env, agent, frames_stack, total_counter, file_name):
     max_steps_evaluation = 1_000
-
     episode_timesteps = 0
     episode_reward    = 0
     episode_num       = 0
@@ -163,13 +173,16 @@ def evaluation_loop(env, agent, frames_stack, total_counter, file_name):
 
     for total_step_counter in range(int(max_steps_evaluation)):
         episode_timesteps += 1
-        action = agent.get_action_from_policy(state, evaluation=True)
+        action = agent.select_action_from_policy(state, evaluation=True)
         state, reward_extrinsic, done = frames_stack.step(action)
         episode_reward += reward_extrinsic
 
         video.write(grab_frame(env))
 
         if done:
+            original_img, reconstruction = agent.get_reconstruction_for_evaluation(state)
+            plot_reconstruction_img(original_img, reconstruction)
+
             logging.info(f" EVALUATION | Eval Episode {episode_num + 1} was completed with {episode_timesteps} steps | Reward= {episode_reward:.3f}")
             state = frames_stack.reset()
             episode_reward    = 0
@@ -190,7 +203,6 @@ def main():
 
     # Domain = cartpole, cheetah, reacher, ball_in_cup
     # task   = balance , run,     easy,    catch
-
     domain_name = "ball_in_cup"
     task_name   = "catch"
     seed        = 1
@@ -199,27 +211,12 @@ def main():
     action_size = action_spec.shape[0]
     latent_size = 50
     number_stack_frames = 3
-    k = number_stack_frames * 3
 
-    encoder = Encoder(latent_dim=latent_size, k=k)
-    decoder = Decoder(latent_dim=latent_size, k=k)
-    actor   = Actor(latent_size, action_size, encoder)
-    critic = Critic(latent_size, action_size, encoder)
-
-    gamma = 0.99
-    tau   = 0.005
-
-    agent = NASA_TD3(
-        encoder,
-        decoder,
-        actor,
-        critic,
-        gamma,
-        tau,
-        action_size,
-        latent_size,
-        device
-    )
+    agent = Algorithm(
+        latent_size=latent_size,
+        action_num=action_size,
+        device=device,
+        k=number_stack_frames)
 
     intrinsic_on  = False
     date_time_str = datetime.now().strftime("%m_%d_%H_%M")

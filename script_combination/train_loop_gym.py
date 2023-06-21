@@ -4,33 +4,47 @@ import gym
 import time
 import torch
 import random
-
-import numpy as np
-import pandas as pd
 from datetime import datetime
-import matplotlib.pyplot as plt
 
 import logging
 logging.basicConfig(level=logging.INFO)
 
-from FrameStack_3CH import FrameStack
-from cares_reinforcement_learning.util   import helpers as hlp
-
 from cares_reinforcement_learning.memory import MemoryBuffer
-from cares_reinforcement_learning.algorithm.policy.NaSATD3 import NASA_TD3
-from cares_reinforcement_learning.networks.NaSATD3 import Actor
-from cares_reinforcement_learning.networks.NaSATD3 import Critic
-from cares_reinforcement_learning.networks.NaSATD3 import Encoder
-from cares_reinforcement_learning.networks.NaSATD3 import Decoder
+from cares_reinforcement_learning.util import helpers as hlp
+
+from Algorithm import Algorithm
+from FrameStack_3CH import FrameStack
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
 
 def plot_reward_curve(data_reward, filename):
     data = pd.DataFrame.from_dict(data_reward)
     data.plot(x='step', y='episode_reward', title="Reward Curve")
     plt.title(filename)
-    # plt.show()
     plt.savefig(f"plots/{filename}.png")
     plt.close()
+
+
+def plot_reconstruction_img(original, reconstruction):
+    input_img      = original[0]/255
+    reconstruction = reconstruction[0]
+    difference     = abs(input_img - reconstruction)
+
+    plt.subplot(1, 3, 1)
+    plt.title("Image Input")
+    plt.imshow(input_img, vmin=0, vmax=1)
+    plt.subplot(1, 3, 2)
+    plt.title("Image Reconstruction")
+    plt.imshow(reconstruction, vmin=0, vmax=1)
+    plt.subplot(1, 3, 3)
+    plt.title("Difference")
+    plt.imshow(difference, vmin=0, vmax=1)
+    plt.pause(0.01)
+
 
 def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
     max_steps_training    = 100_000
@@ -43,7 +57,6 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
 
     min_action_value = env.action_space.low[0]
     max_action_value = env.action_space.high[0]
-
     #-----------------------------------#
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -51,7 +64,6 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
     random.seed(seed)
     env.action_space.seed(seed)
     # -----------------------------------#
-
     memory       = MemoryBuffer()
     frames_stack = FrameStack(env, k)
 
@@ -83,13 +95,14 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
             reward_novelty  = novelty_rate  * b
             logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
             total_reward = reward_extrinsic + reward_surprise + reward_novelty
+
         else:
             total_reward = reward_extrinsic
 
         memory.add(state=state, action=action, reward=total_reward, next_state=next_state, done=done)
         state = next_state
 
-        episode_reward += reward_extrinsic  # just for plotting and evaluation purposes use the reward as it is
+        episode_reward += reward_extrinsic  # just for plotting and evaluation purposes use the  reward as it is
 
         if total_step_counter >= max_steps_exploration:
             num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
@@ -109,7 +122,7 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
                     agent.train_predictive_model((
                         experience['state'],
                         experience['action'],
-                        experience['next_state']
+                        experience['next_state'],
                     ))
 
         if done or truncated:
@@ -133,12 +146,11 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
                 print("--------------------------------------------")
 
     agent.save_models(filename=file_name)
-    plot_reward_curve(historical_reward, filename=file_name)
+    plot_reward_curve(historical_reward, file_name)
 
 
 def evaluation_loop(env, agent, frames_stack, total_counter, max_action_value, min_action_value, file_name):
     max_steps_evaluation = 1_000
-
     episode_timesteps = 0
     episode_reward    = 0
     episode_num       = 0
@@ -161,12 +173,14 @@ def evaluation_loop(env, agent, frames_stack, total_counter, max_action_value, m
         video.write(grab_frame(env))
 
         if done or truncated:
+            original_img, reconstruction = agent.get_reconstruction_for_evaluation(state)
+            plot_reconstruction_img(original_img, reconstruction)
+
             logging.info(f" EVALUATION | Eval Episode {episode_num + 1} was completed with {episode_timesteps} steps | Reward= {episode_reward:.3f}")
             state = frames_stack.reset()
             episode_reward    = 0
             episode_timesteps = 0
             episode_num       += 1
-
     video.release()
 
 
@@ -177,34 +191,18 @@ def grab_frame(env):
 
 
 def main():
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+    device       = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     env_gym_name = "Pendulum-v1" # BipedalWalker-v3, Pendulum-v1, HalfCheetah-v4"
     env          = gym.make(env_gym_name, render_mode="rgb_array")
     action_size  = env.action_space.shape[0]
     latent_size  = 50
     number_stack_frames = 3
-    k = number_stack_frames * 3
 
-    encoder = Encoder(latent_dim=latent_size, k=k)
-    decoder = Decoder(latent_dim=latent_size, k=k)
-    actor   = Actor(latent_size, action_size, encoder)
-    critic  = Critic(latent_size, action_size, encoder)
-
-    gamma = 0.99
-    tau   = 0.005
-
-    agent = NASA_TD3(
-        encoder,
-        decoder,
-        actor,
-        critic,
-        gamma,
-        tau,
-        action_size,
-        latent_size,
-        device
-    )
+    agent = Algorithm(
+        latent_size=latent_size,
+        action_num=action_size,
+        device=device,
+        k=number_stack_frames)
 
     intrinsic_on  = False
     date_time_str = datetime.now().strftime("%m_%d_%H_%M")
