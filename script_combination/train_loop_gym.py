@@ -86,7 +86,7 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
             surprise_rate, novelty_rate = agent.get_intrinsic_values(state, action, next_state)
             reward_surprise = surprise_rate * a
             reward_novelty  = novelty_rate  * b
-            logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
+            #logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
             total_reward = reward_extrinsic + reward_surprise + reward_novelty
 
         else:
@@ -98,11 +98,10 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
         episode_reward += reward_extrinsic  # just for plotting and evaluation purposes use the  reward as it is
 
         if total_step_counter >= max_steps_exploration:
-            num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
+            #num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
 
-            for _ in range(num_updates):
+            for _ in range(G):
                 experience = memory.sample(batch_size)
-
                 agent.train_policy((
                     experience['state'],
                     experience['action'],
@@ -110,7 +109,6 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
                     experience['next_state'],
                     experience['done'],
                 ))
-
                 if intrinsic_on:
                     agent.train_predictive_model((
                         experience['state'],
@@ -211,7 +209,7 @@ def main():
         device=device,
         k=number_stack_frames)
 
-    intrinsic_on  = False
+    intrinsic_on  = True
     date_time_str = datetime.now().strftime("%m_%d_%H_%M")
     file_name     = env_gym_name  + "_" + str(date_time_str) + "_" + "NASA_TD3" + "_Intrinsic_" + str(intrinsic_on)
 

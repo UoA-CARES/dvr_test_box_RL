@@ -49,8 +49,8 @@ def train(env, agent, file_name, intrinsic_on, number_stack_frames):
     max_steps_training    = 1_000_000
     max_steps_exploration = 1_000
 
-    batch_size = 128
-    G          = 1
+    batch_size = 32
+    G          = 5
     k          = number_stack_frames
     # ------------------------------------#
 
@@ -104,9 +104,8 @@ def train(env, agent, file_name, intrinsic_on, number_stack_frames):
         episode_reward += reward_extrinsic  # just for plotting purposes use this reward as it is
 
         if total_step_counter >= max_steps_exploration:
-            num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
-
-            for _ in range(num_updates):
+            #num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
+            for _ in range(G):
                 experience = memory.sample(batch_size)
 
                 agent.train_policy((
