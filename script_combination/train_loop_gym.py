@@ -99,8 +99,7 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
 
         if total_step_counter >= max_steps_exploration:
             #num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
-
-            for _ in range(G):
+            for i in range(G):
                 experience = memory.sample(batch_size)
                 agent.train_policy((
                     experience['state'],

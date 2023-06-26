@@ -93,7 +93,7 @@ def train(env, agent, file_name, intrinsic_on, number_stack_frames):
             surprise_rate, novelty_rate = agent.get_intrinsic_values(state, action, next_state)
             reward_surprise = surprise_rate * a
             reward_novelty  = novelty_rate  * b
-            logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
+            #logging.info(f"Surprise Rate = {reward_surprise},  Novelty Rate = {reward_novelty}, Normal Reward = {reward_extrinsic}, {total_step_counter}")
             total_reward = reward_extrinsic + reward_surprise + reward_novelty
         else:
             total_reward = reward_extrinsic
@@ -216,7 +216,7 @@ def main():
         device=device,
         k=number_stack_frames)
 
-    intrinsic_on  = False
+    intrinsic_on  = True
     date_time_str = datetime.now().strftime("%m_%d_%H_%M")
     file_name     = domain_name + "_" + str(date_time_str) + "_" + task_name + "_" + "NASA_TD3" + "_Intrinsic_" + str(intrinsic_on)
 
