@@ -1,4 +1,5 @@
 
+import os
 import cv2
 import gym
 import time
@@ -50,7 +51,7 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
     max_steps_training    = 100_000
     max_steps_exploration = 1_000
 
-    batch_size = 128
+    batch_size = 32
     G          = 5
     k          = number_stack_frames
 
@@ -192,6 +193,16 @@ def main():
     action_size  = env.action_space.shape[0]
     latent_size  = 50
     number_stack_frames = 3
+
+    # Create Directories
+    # ---------------------------------------
+    dir_exists = os.path.exists("videos")
+    if not dir_exists:
+        os.makedirs("videos")
+
+    dir_exists = os.path.exists("plots")
+    if not dir_exists:
+        os.makedirs("plots")
 
     # set seeds
     # ---------------------------------------
