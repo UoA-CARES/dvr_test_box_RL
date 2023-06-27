@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 
 def plot_reward_curve(data_reward, filename):
     data = pd.DataFrame.from_dict(data_reward)
+    data.to_csv(f"data_plots/{filename}", index=False)
     data.plot(x='step', y='episode_reward', title="Reward Curve")
     plt.title(filename)
     plt.savefig(f"plots/{filename}.png")
