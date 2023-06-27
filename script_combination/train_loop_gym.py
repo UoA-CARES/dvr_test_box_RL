@@ -208,7 +208,7 @@ def main():
         device=device,
         k=number_stack_frames)
 
-    intrinsic_on  = True
+    intrinsic_on  = False
     date_time_str = datetime.now().strftime("%m_%d_%H_%M")
     file_name     = env_gym_name  + "_" + str(date_time_str) + "_" + "NASA_TD3" + "_Intrinsic_" + str(intrinsic_on)
 
