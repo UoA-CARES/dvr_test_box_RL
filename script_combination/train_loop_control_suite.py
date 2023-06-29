@@ -1,4 +1,5 @@
 
+import os
 import cv2
 import time
 import torch
@@ -171,8 +172,8 @@ def evaluation_loop(env, agent, frames_stack, total_counter, file_name):
         video.write(grab_frame(env))
 
         if done:
-            original_img, reconstruction = agent.get_reconstruction_for_evaluation(state)
-            plot_reconstruction_img(original_img, reconstruction)
+            #original_img, reconstruction = agent.get_reconstruction_for_evaluation(state)
+            #plot_reconstruction_img(original_img, reconstruction)
 
             logging.info(f" EVALUATION | Eval Episode {episode_num + 1} was completed with {episode_timesteps} steps | Reward= {episode_reward:.3f}")
             state = frames_stack.reset()
@@ -203,6 +204,20 @@ def main():
     latent_size = 50
     number_stack_frames = 3
 
+    # Create Directories
+    # ---------------------------------------
+    dir_exists = os.path.exists("videos")
+    if not dir_exists:
+        os.makedirs("videos")
+
+    dir_exists = os.path.exists("plots")
+    if not dir_exists:
+        os.makedirs("plots")
+
+    dir_exists = os.path.exists("data_plots")
+    if not dir_exists:
+        os.makedirs("data_plots")
+
     # set seeds
     #---------------------------------------
     torch.manual_seed(seed)
@@ -217,7 +232,7 @@ def main():
         device=device,
         k=number_stack_frames)
 
-    intrinsic_on  = True
+    intrinsic_on  = False
     date_time_str = datetime.now().strftime("%m_%d_%H_%M")
     file_name     = domain_name + "_" + str(date_time_str) + "_" + task_name + "_" + "NASA_TD3" + "_Intrinsic_" + str(intrinsic_on)
 

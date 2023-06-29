@@ -49,7 +49,7 @@ def plot_reconstruction_img(original, reconstruction):
 
 
 def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
-    max_steps_training    = 100_000
+    max_steps_training    = 500_000
     max_steps_exploration = 1_000
 
     batch_size = 32
@@ -165,8 +165,8 @@ def evaluation_loop(env, agent, frames_stack, total_counter, max_action_value, m
         video.write(grab_frame(env))
 
         if done or truncated:
-            original_img, reconstruction = agent.get_reconstruction_for_evaluation(state)
-            plot_reconstruction_img(original_img, reconstruction)
+            #original_img, reconstruction = agent.get_reconstruction_for_evaluation(state)
+            #plot_reconstruction_img(original_img, reconstruction)
 
             logging.info(f" EVALUATION | Eval Episode {episode_num + 1} was completed with {episode_timesteps} steps | Reward= {episode_reward:.3f}")
             state = frames_stack.reset()
@@ -185,9 +185,9 @@ def grab_frame(env):
 def main():
 
     device       = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    seed         = 1
+    seed         = 100
 
-    env_gym_name = "Pendulum-v1" # BipedalWalker-v3, Pendulum-v1, HalfCheetah-v4"
+    env_gym_name = "HalfCheetah-v4" # BipedalWalker-v3, Pendulum-v1, HalfCheetah-v4"
     env          = gym.make(env_gym_name, render_mode="rgb_array")
     env.reset(seed=seed)
 
