@@ -191,7 +191,7 @@ class Algorithm:
             z_next_latent_prediction = np.mean(ensemble_vector, axis=0) # prediction vector average among the ensembles models
             z_next_latent_true       = latent_next_state.detach().cpu().numpy()[0]
             mse = (np.square(z_next_latent_prediction - z_next_latent_true)).mean()
-            return mse
+        return mse
 
     def get_novelty_rate(self, state_tensor_img):
         with torch.no_grad():

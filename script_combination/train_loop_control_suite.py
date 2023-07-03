@@ -232,7 +232,7 @@ def main():
         device=device,
         k=number_stack_frames)
 
-    intrinsic_on  = False
+    intrinsic_on  = True
     date_time_str = datetime.now().strftime("%m_%d_%H_%M")
     file_name     = domain_name + "_" + str(date_time_str) + "_" + task_name + "_" + "NASA_TD3" + "_Intrinsic_" + str(intrinsic_on)
 
