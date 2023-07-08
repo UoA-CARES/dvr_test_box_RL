@@ -49,6 +49,7 @@ def plot_reconstruction_img(original, reconstruction):
 
 
 def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
+
     max_steps_training    = 500_000
     max_steps_exploration = 1_000
 
@@ -70,9 +71,10 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
     start_time = time.time()
     state      = frames_stack.reset()  # for k images
 
-    for total_step_counter in range(int(max_steps_training)):
+    for total_step_counter in range(1, int(max_steps_training)+1):
         episode_timesteps += 1
-        if total_step_counter < max_steps_exploration:
+
+        if total_step_counter <= max_steps_exploration:
             logging.info(f"Running Exploration Steps {total_step_counter}/{max_steps_exploration}")
             action_env = env.action_space.sample()  # action range the env uses [e.g. -2 , 2 for pendulum]
             action     = hlp.normalize(action_env, max_action_value, min_action_value)  # algorithm range [-1, 1]
@@ -82,7 +84,7 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
 
         next_state, reward_extrinsic, done, truncated, info = frames_stack.step(action_env)
 
-        if intrinsic_on and total_step_counter >= max_steps_exploration:
+        if intrinsic_on and total_step_counter > max_steps_exploration:
             a = 0.5
             b = 0.5
             surprise_rate, novelty_rate = agent.get_intrinsic_values(state, action, next_state)
@@ -99,7 +101,7 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
 
         episode_reward += reward_extrinsic  # just for plotting and evaluation purposes use the  reward as it is
 
-        if total_step_counter >= max_steps_exploration:
+        if total_step_counter > max_steps_exploration:
             #num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
             for i in range(G):
                 experience = memory.sample(batch_size)
@@ -121,7 +123,7 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
             episode_duration = time.time() - start_time
             start_time       = time.time()
 
-            logging.info(f"Total T:{total_step_counter + 1} | Episode {episode_num + 1} was completed with {episode_timesteps} steps | Reward= {episode_reward:.3f} | Duration= {episode_duration:.2f} Seg")
+            logging.info(f"Total T:{total_step_counter} | Episode {episode_num + 1} was completed with {episode_timesteps} steps | Reward= {episode_reward:.3f} | Duration= {episode_duration:.2f} Sec")
             historical_reward["step"].append(total_step_counter)
             historical_reward["episode_reward"].append(episode_reward)
 
@@ -132,8 +134,8 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
             episode_num       += 1
 
             if episode_num % 10 == 0:
-                plot_reward_curve(historical_reward, filename=file_name)
                 print("--------------------------------------------")
+                plot_reward_curve(historical_reward, filename=file_name)
                 evaluation_loop(env, agent, frames_stack, total_step_counter, max_action_value, min_action_value, file_name)
                 print("--------------------------------------------")
 
@@ -165,8 +167,8 @@ def evaluation_loop(env, agent, frames_stack, total_counter, max_action_value, m
         video.write(grab_frame(env))
 
         if done or truncated:
-            #original_img, reconstruction = agent.get_reconstruction_for_evaluation(state)
-            #plot_reconstruction_img(original_img, reconstruction)
+            original_img, reconstruction = agent.get_reconstruction_for_evaluation(state)
+            plot_reconstruction_img(original_img, reconstruction)
 
             logging.info(f" EVALUATION | Eval Episode {episode_num + 1} was completed with {episode_timesteps} steps | Reward= {episode_reward:.3f}")
             state = frames_stack.reset()
@@ -187,7 +189,7 @@ def main():
     device       = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     seed         = 100
 
-    env_gym_name = "HalfCheetah-v4" # BipedalWalker-v3, Pendulum-v1, HalfCheetah-v4"
+    env_gym_name = "Pendulum-v1" # BipedalWalker-v3, Pendulum-v1, HalfCheetah-v4"
     env          = gym.make(env_gym_name, render_mode="rgb_array")
     env.reset(seed=seed)
 

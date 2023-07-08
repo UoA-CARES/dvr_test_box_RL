@@ -56,8 +56,8 @@ class Algorithm:
         self.actor_optimizer  = torch.optim.Adam(self.actor.parameters(),   lr=lr_actor)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(),  lr=lr_critic)
 
-        lr_encoder = 1e-3
-        lr_decoder = 1e-3
+        lr_encoder = 1e-4
+        lr_decoder = 1e-4
         self.encoder_optimizer = torch.optim.Adam(self.encoder.parameters(), lr=lr_encoder)
         self.decoder_optimizer = torch.optim.Adam(self.decoder.parameters(), lr=lr_decoder, weight_decay=1e-7)
 
@@ -165,7 +165,7 @@ class Algorithm:
 
     def get_intrinsic_values(self, state, action, next_state, plot_flag=False):
         with torch.no_grad():
-            state_tensor     = torch.FloatTensor(state).to(self.device)
+            state_tensor      = torch.FloatTensor(state).to(self.device)
             state_tensor      = state_tensor.unsqueeze(0)
             next_state_tensor = torch.FloatTensor(next_state).to(self.device)
             next_state_tensor = next_state_tensor.unsqueeze(0)
