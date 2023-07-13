@@ -193,12 +193,12 @@ class Algorithm:
             mse = (np.square(z_next_latent_prediction - z_next_latent_true)).mean()
         return mse
 
-    def get_novelty_rate(self, state_tensor_img):
+    def get_novelty_rate(self, state_tensor):
         with torch.no_grad():
-            z_vector = self.encoder(state_tensor_img)
+            z_vector = self.encoder(state_tensor)
             rec_img  = self.decoder(z_vector) # Note: rec_img is a stack of k images --> (1, k , 84 ,84),
 
-            original_stack_imgs  = state_tensor_img.cpu().numpy()[0]  # --> (k , 84 ,84)
+            original_stack_imgs  = state_tensor.cpu().numpy()[0]  # --> (k , 84 ,84)
             reconstruction_stack = rec_img.cpu().numpy()[0]           # --> (k , 84 ,84)
 
         target_images     = original_stack_imgs / 255
