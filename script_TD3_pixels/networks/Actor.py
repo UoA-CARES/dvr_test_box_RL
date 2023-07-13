@@ -1,6 +1,6 @@
 
 import torch.nn as nn
-print("fine Actor")
+
 class Actor(nn.Module):
     def __init__(self, latent_size, num_actions, encoder):
 

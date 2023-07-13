@@ -1,7 +1,7 @@
 
 import torch
 import torch.nn as nn
-print("fine Critic")
+
 
 class Critic(nn.Module):
     def __init__(self, latent_size, num_actions, encoder):

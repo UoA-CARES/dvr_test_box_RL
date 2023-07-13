@@ -2,7 +2,7 @@
 import torch
 import torch.nn as nn
 
-print("fine encoder")
+
 class Encoder(nn.Module):
     def __init__(self, latent_dim, k=3):
         super(Encoder, self).__init__()

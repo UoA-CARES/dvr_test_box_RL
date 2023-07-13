@@ -2,7 +2,7 @@
 
 import numpy as np
 from collections import deque
-print("Frame stack ok")
+
 class FrameStack:
     def __init__(self, env, k=3):
         self.env  = env

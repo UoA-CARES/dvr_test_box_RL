@@ -97,16 +97,16 @@ def train(env, agent, file_name, number_stack_frames):
             historical_reward["step"].append(total_step_counter)
             historical_reward["episode_reward"].append(episode_reward)
 
+            state = frames_stack.reset()
+            episode_reward = 0
+            episode_timesteps = 0
+            episode_num += 1
+
             if episode_num % 10 == 0:
                 print("*************--Evaluation--*************")
                 plot_reward_curve(historical_reward, filename=file_name)
                 evaluation_loop(env, agent, frames_stack, total_step_counter, file_name)
                 print("--------------------------------------------")
-
-            state = frames_stack.reset()
-            episode_reward = 0
-            episode_timesteps = 0
-            episode_num += 1
 
     agent.save_models(filename=file_name)
     plot_reward_curve(historical_reward, filename=file_name)
