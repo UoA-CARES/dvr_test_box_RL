@@ -36,7 +36,7 @@ def train(env, agent, file_name, number_stack_frames):
     max_steps_exploration = 1_000
 
     batch_size = 32
-    G = 1 # todo put this 5
+    G = 5
     k = number_stack_frames
 
     # Action size and format
