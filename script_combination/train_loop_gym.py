@@ -59,8 +59,8 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
     max_steps_training    = 500_000
     max_steps_exploration = 1_000
 
-    batch_size = 32
-    G          = 5
+    batch_size = 128
+    G          = 1
     k          = number_stack_frames
 
     min_action_value = env.action_space.low[0]
@@ -74,6 +74,9 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
     episode_num       = 0
     historical_reward = {"step": [], "episode_reward": []}
     historical_reward_evaluation = {"step": [], "avg_episode_reward": []}
+
+    historical_reward_evaluation["step"].append(0)
+    historical_reward_evaluation["avg_episode_reward"].append(0)
 
     start_time = time.time()
     state      = frames_stack.reset()  # for k images
@@ -108,23 +111,23 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
 
         episode_reward += reward_extrinsic  # just for plotting and evaluation purposes use the  reward as it is
 
-        # if total_step_counter > max_steps_exploration:
-        #     #num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
-        #     for i in range(G):
-        #         experience = memory.sample(batch_size)
-        #         agent.train_policy((
-        #             experience['state'],
-        #             experience['action'],
-        #             experience['reward'],
-        #             experience['next_state'],
-        #             experience['done'],
-        #         ))
-        #         if intrinsic_on:
-        #             agent.train_predictive_model((
-        #                 experience['state'],
-        #                 experience['action'],
-        #                 experience['next_state'],
-        #             ))
+        if total_step_counter > max_steps_exploration:
+            #num_updates = max_steps_exploration if total_step_counter == max_steps_exploration+1 else G
+            for i in range(G):
+                experience = memory.sample(batch_size)
+                agent.train_policy((
+                    experience['state'],
+                    experience['action'],
+                    experience['reward'],
+                    experience['next_state'],
+                    experience['done'],
+                ))
+                if intrinsic_on:
+                    agent.train_predictive_model((
+                        experience['state'],
+                        experience['action'],
+                        experience['next_state'],
+                    ))
 
         if done or truncated:
             episode_duration = time.time() - start_time
@@ -189,9 +192,7 @@ def evaluation_loop(env, agent, frames_stack, total_counter, max_action_value, m
             episode_timesteps = 0
             episode_num       += 1
 
-    print(historical_episode_reward_evaluation)
     mean_reward_evaluation = np.round(np.mean(historical_episode_reward_evaluation),2)
-    print(mean_reward_evaluation)
     historical_reward_evaluation["avg_episode_reward"].append(mean_reward_evaluation)
     historical_reward_evaluation["step"].append(total_counter)
 
@@ -208,7 +209,7 @@ def grab_frame(env):
 def main():
 
     device       = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    seed         = 100
+    seed         = 50
 
     env_gym_name = "Pendulum-v1" # BipedalWalker-v3, Pendulum-v1, HalfCheetah-v4"
     env          = gym.make(env_gym_name, render_mode="rgb_array")

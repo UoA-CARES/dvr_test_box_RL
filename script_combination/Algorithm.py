@@ -181,7 +181,6 @@ class Algorithm:
         with torch.no_grad():
             latent_state      = self.encoder(state_tensor, detach=True)
             latent_next_state = self.encoder(next_state_tensor, detach=True)
-
             predict_vector_set = []
             for network in self.epm:
                 network.eval()
