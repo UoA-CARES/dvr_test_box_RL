@@ -22,6 +22,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
+
+def save_evaluation_values(data_eval_reward, filename):
+    data = pd.DataFrame.from_dict(data_eval_reward)
+    data.to_csv(f"data_plots/{filename}_evaluation", index=False)
+
+
 def plot_reward_curve(data_reward, filename):
     data = pd.DataFrame.from_dict(data_reward)
     data.to_csv(f"data_plots/{filename}", index=False)
@@ -67,6 +73,7 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
     episode_reward    = 0
     episode_num       = 0
     historical_reward = {"step": [], "episode_reward": []}
+    historical_reward_evaluation = {"step": [], "avg_episode_reward": []}
 
     start_time = time.time()
     state      = frames_stack.reset()  # for k images
@@ -101,23 +108,23 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
 
         episode_reward += reward_extrinsic  # just for plotting and evaluation purposes use the  reward as it is
 
-        if total_step_counter > max_steps_exploration:
-            #num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
-            for i in range(G):
-                experience = memory.sample(batch_size)
-                agent.train_policy((
-                    experience['state'],
-                    experience['action'],
-                    experience['reward'],
-                    experience['next_state'],
-                    experience['done'],
-                ))
-                if intrinsic_on:
-                    agent.train_predictive_model((
-                        experience['state'],
-                        experience['action'],
-                        experience['next_state'],
-                    ))
+        # if total_step_counter > max_steps_exploration:
+        #     #num_updates = max_steps_exploration if total_step_counter == max_steps_exploration else G
+        #     for i in range(G):
+        #         experience = memory.sample(batch_size)
+        #         agent.train_policy((
+        #             experience['state'],
+        #             experience['action'],
+        #             experience['reward'],
+        #             experience['next_state'],
+        #             experience['done'],
+        #         ))
+        #         if intrinsic_on:
+        #             agent.train_predictive_model((
+        #                 experience['state'],
+        #                 experience['action'],
+        #                 experience['next_state'],
+        #             ))
 
         if done or truncated:
             episode_duration = time.time() - start_time
@@ -136,14 +143,14 @@ def train(env, agent,  file_name, intrinsic_on, number_stack_frames):
             if episode_num % 10 == 0:
                 print("--------------------------------------------")
                 plot_reward_curve(historical_reward, filename=file_name)
-                evaluation_loop(env, agent, frames_stack, total_step_counter, max_action_value, min_action_value, file_name)
+                evaluation_loop(env, agent, frames_stack, total_step_counter, max_action_value, min_action_value, file_name, historical_reward_evaluation)
                 print("--------------------------------------------")
 
     agent.save_models(filename=file_name)
     plot_reward_curve(historical_reward, file_name)
 
 
-def evaluation_loop(env, agent, frames_stack, total_counter, max_action_value, min_action_value, file_name):
+def evaluation_loop(env, agent, frames_stack, total_counter, max_action_value, min_action_value, file_name, historical_reward_evaluation):
     max_steps_evaluation = 1_000
     episode_timesteps = 0
     episode_reward    = 0
@@ -152,29 +159,43 @@ def evaluation_loop(env, agent, frames_stack, total_counter, max_action_value, m
     state = frames_stack.reset()
     frame = grab_frame(env)
 
+    historical_episode_reward_evaluation = []
+
+
     fps = 30
-    video_name = f'videos/{file_name}_{total_counter+1}.mp4'
+    video_name = f'videos/{file_name}_{total_counter}.mp4'
     height, width, channels = frame.shape
     video = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
 
-    for total_step_counter in range(int(max_steps_evaluation)):
+    for total_step_counter in range(max_steps_evaluation):
         episode_timesteps += 1
         action     = agent.select_action_from_policy(state, evaluation=True)
         action_env = hlp.denormalize(action, max_action_value, min_action_value)
         state, reward_extrinsic, done, truncated, info = frames_stack.step(action_env)
         episode_reward += reward_extrinsic
 
-        video.write(grab_frame(env))
+        if episode_num == 0:
+            video.write(grab_frame(env))
 
         if done or truncated:
             original_img, reconstruction = agent.get_reconstruction_for_evaluation(state)
             plot_reconstruction_img(original_img, reconstruction)
 
             logging.info(f" EVALUATION | Eval Episode {episode_num + 1} was completed with {episode_timesteps} steps | Reward= {episode_reward:.3f}")
+            historical_episode_reward_evaluation.append(episode_reward)
+
             state = frames_stack.reset()
             episode_reward    = 0
             episode_timesteps = 0
             episode_num       += 1
+
+    print(historical_episode_reward_evaluation)
+    mean_reward_evaluation = np.round(np.mean(historical_episode_reward_evaluation),2)
+    print(mean_reward_evaluation)
+    historical_reward_evaluation["avg_episode_reward"].append(mean_reward_evaluation)
+    historical_reward_evaluation["step"].append(total_counter)
+
+    save_evaluation_values(historical_reward_evaluation, file_name)
     video.release()
 
 
