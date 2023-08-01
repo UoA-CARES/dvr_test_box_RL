@@ -102,6 +102,7 @@ class Algorithm:
         rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
         dones   = dones.unsqueeze(0).reshape(batch_size, 1)
 
+
         with torch.no_grad():
             next_actions = self.actor_target(next_states)
             target_noise = 0.2 * torch.randn_like(next_actions)

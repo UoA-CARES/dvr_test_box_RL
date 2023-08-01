@@ -16,11 +16,13 @@ from cares_reinforcement_learning.util import helpers as hlp
 from Algorithm import Algorithm
 from FrameStack_3CH import FrameStack
 
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from nes_py.wrappers import JoypadSpace
+import gym_super_mario_bros
+from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 
 
 def save_evaluation_values(data_eval_reward, filename):
@@ -213,9 +215,16 @@ def main():
 
     env_gym_name = "Pendulum-v1" # BipedalWalker-v3, Pendulum-v1, HalfCheetah-v4"
     env          = gym.make(env_gym_name, render_mode="rgb_array")
+
+    # env_gym_name = "SuperMarioBros-v0"
+    # env = gym.make('SuperMarioBros-v0', apply_api_compatibility=True, render_mode="rgb_array")
+
+
     env.reset(seed=seed)
 
     action_size  = env.action_space.shape[0]
+    print(action_size)
+
     latent_size  = 50
     number_stack_frames = 3
 
@@ -242,17 +251,17 @@ def main():
     env.action_space.seed(seed)
     # ---------------------------------------
 
-    agent = Algorithm(
-        latent_size=latent_size,
-        action_num=action_size,
-        device=device,
-        k=number_stack_frames)
-
-    intrinsic_on  = False
-    date_time_str = datetime.now().strftime("%m_%d_%H_%M")
-    file_name     = env_gym_name  + "_" + str(date_time_str) + "_" + "NASA_TD3" + "_Intrinsic_" + str(intrinsic_on)
-
-    train(env, agent, file_name, intrinsic_on, number_stack_frames)
+    # agent = Algorithm(
+    #     latent_size=latent_size,
+    #     action_num=action_size,
+    #     device=device,
+    #     k=number_stack_frames)
+    #
+    # intrinsic_on  = True
+    # date_time_str = datetime.now().strftime("%m_%d_%H_%M")
+    # file_name     = env_gym_name  + "_" + str(date_time_str) + "_" + "NASA_TD3" + "_Intrinsic_" + str(intrinsic_on)
+    #
+    # train(env, agent, file_name, intrinsic_on, number_stack_frames)
 
 
 if __name__ == '__main__':
